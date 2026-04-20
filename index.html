@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate AR & WebXR v7.4</title>
+    <title>Taser 7 - Ultimate AR & WebXR v7.5</title>
     <style>
         * { box-sizing: border-box; }
 
@@ -36,7 +36,7 @@
         @keyframes redStrobe { 0% { filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2); } 100% { filter: none; } }
 
         /* ----- SIKTET (FASTLÅST I MITTEN) ----- */
-        .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; /* Fix för WebXR */ }
         .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; }
         .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.5); }
         .crosshair::before { top: 50%; left: -5px; right: -5px; height: 1px; transform: translateY(-50%); }
@@ -123,9 +123,8 @@
         
         button.action-btn { width: 100%; background-color: #34495e; color: white; border: 1px solid #1a252f; padding: 8px 4px; margin-bottom: 4px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 10px; touch-action: manipulation; transition: 0.1s; }
         button.action-btn:active { transform: scale(0.98); background-color: #3d566e; }
-        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 4px; }
         .btn-grid-compact { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 4px; }
-        .btn-grid .action-btn, .btn-grid-compact .action-btn { margin-bottom: 0; }
+        .btn-grid-compact .action-btn { margin-bottom: 0; }
         .btn-trigger { background-color: #c0392b !important; border-color: #922b21 !important; font-size: 14px !important; padding: 14px !important; text-transform: uppercase; box-shadow: 0 3px 0 #7b241c; margin-top: 5px !important; margin-bottom: 10px !important; }
         .btn-trigger:active { box-shadow: 0 0 0 #7b241c; transform: translateY(3px); }
         .btn-info { background-color: #2980b9 !important; border-color: #1f618d !important; margin-bottom: 6px !important; font-size: 10px !important; padding: 6px !important;}
@@ -138,7 +137,7 @@
         .btn-kontaktstot:active { box-shadow: 0 0 0 #ba4a00; transform: translateY(3px); }
         .log-box { background-color: #050505; color: #00ff00; font-family: monospace; font-size: 9px; height: 60px; overflow-y: auto; padding: 6px; border-radius: 5px; margin-top: 8px; border: 1px solid #222;}
 
-        /* ----- NYTT PLACERINGS-UI (Ersätter skjut-knapparna tillfälligt) ----- */
+        /* ----- NYTT PLACERINGS-UI ----- */
         #placement-controls { display: none; text-align: center; padding-top: 10px; }
         .btn-confirm { width: 100%; padding: 15px; background: #27ae60 !important; color: white; font-weight: bold; font-size: 14px; border: 2px solid #2ecc71 !important; border-radius: 8px; cursor: pointer; text-transform: uppercase; box-shadow: 0 3px 0 #219653; margin-bottom: 10px;}
         .btn-confirm:active { background: #219653 !important; transform: translateY(3px); box-shadow: 0 0 0 #219653;}
@@ -150,7 +149,8 @@
         body.webxr-mode .main-container { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 400px; padding-bottom: env(safe-area-inset-bottom, 20px); }
         body.webxr-mode .footer { display: none; }
         body.webxr-mode .sim-controls { background-color: rgba(44, 62, 80, 0.95); box-shadow: none; border: none; border-radius: 15px 15px 0 0;}
-        body.webxr-mode .log-box { display: none; }
+        /* Loggen ska visas i WebXR så vi ser NMI-resultaten! */
+        body.webxr-mode .log-box { display: block; border-color: rgba(255,255,255,0.2); }
 
         /* Modaler */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 15px;}
@@ -158,7 +158,6 @@
         .modal-close { position: absolute; top: 5px; right: 15px; font-size: 28px; color: #e74c3c; cursor: pointer; background: none; border: none; font-weight: bold; padding: 0;}
         .modal-content h2 { margin-top: 0; color: #f1c40f; border-bottom: 1px solid #34495e; padding-bottom: 8px; font-size: 16px;}
         .modal-content p, .modal-content li { font-size: 11px; line-height: 1.4; color: #bdc3c7;}
-        .key-icon { background-color: #444; color: #fff; padding: 2px 4px; border-radius: 3px; border: 1px solid #111; font-family: monospace; font-size: 9px;}
     </style>
 </head>
 <body>
@@ -169,7 +168,7 @@
         <div class="viewport" id="viewport">
             <div id="three-canvas"></div>
             <video id="camera-feed" class="camera-feed" autoplay playsinline></video>
-            
+
             <div class="fixed-aim-layer">
                 <div class="crosshair"></div>
                 <div id="flashlight" class="flashlight-beam"></div>
@@ -235,13 +234,7 @@
                     <div class="btn-grid-compact">
                         <button class="action-btn" id="btn-webxr" onclick="window.startXR()">🌐 WebXR</button>
                         <button class="action-btn" id="btn-place" onclick="window.togglePlaceMode()">📍 Flytta figur</button>
-                        <button class="action-btn" id="btn-invert" onclick="window.toggleInvertMouse()">↕️ Inv. Mus</button>
-                    </div>
-
-                    <div class="btn-grid-compact">
-                        <button class="action-btn" id="btn-toggle-3d" onclick="window.toggle3DModel()" style="display:none;">👁️ Dölj 3D</button>
                         <button class="action-btn btn-reset" onclick="window.resetSimulator()">♻️ Återställ</button>
-                        <button class="action-btn btn-info" onclick="window.openModal('info-modal')">ℹ️ Lathund</button>
                     </div>
                 </div>
 
@@ -255,14 +248,6 @@
             </div>
         </div>
         <div class="footer">&copy; Cullibrick 2026</div>
-    </div>
-
-    <div id="info-modal" class="modal-overlay">
-        <div class="modal-content">
-            <button class="modal-close" onclick="window.closeModal('info-modal')">×</button>
-            <h2>Lathund: Taser 7 AR & WebXR</h2>
-            <p><strong>AR Placering:</strong> Tryck på "🌐 WebXR" eller "📷 Kamera". Menyn byts ut mot ett placeringsläge. Titta runt på golvet tills markören visar sig, och klicka sedan på "Fastställ Position" för att låsa gubben i rummet.</p>
-        </div>
     </div>
 
     <script type="importmap">
@@ -280,8 +265,10 @@
             const entry = document.createElement('div');
             entry.className = 'log-entry'; entry.innerHTML = `> ${msg}`;
             logBox.prepend(entry);
+            // Auto-scroll till toppen
+            logBox.scrollTop = 0;
         }
-        window.log("Simulator v7.4 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
+        window.log("Simulator v7.5 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
 
         // FÖRHINDRA ATT KLICK PÅ UI SKICKAS TILL 3D/WEBXR MILJÖN!
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
@@ -304,7 +291,6 @@
         
         let audioCtx = null; let isAudioInit = false; let soundInterval = null;
 
-        // Input
         window.addEventListener('keydown', function(event) {
             const k = event.key.toLowerCase();
             if (event.code === 'Space') { event.preventDefault(); window.pressTrigger(); } 
@@ -388,7 +374,7 @@
                 window.taserGroup.position.y += 0.9; 
                 window.taserGroup.visible = true;
             } else if (window.taserGroup) {
-                window.taserGroup.visible = true; // Fallback
+                window.taserGroup.visible = true; 
             }
             
             if (window.placeMarker) window.placeMarker.visible = false;
@@ -585,7 +571,7 @@
             window.initAudio();
             if(!window.hasBattery || !window.isSafe) { window.log("<span style='color:red'>Säkra vapnet</span> för att växla Dolt Läge."); return; }
             window.stealthMode = !window.stealthMode;
-            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span>"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
+            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span> (Display släckta)"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
             window.updateDisplay();
         }
 
@@ -655,7 +641,8 @@
         let taserGroup = new THREE.Group(); scene.add(taserGroup); window.taserGroup = taserGroup;
         const loader = new GLTFLoader();
         
-        loader.load('ue_mannequin_retopology.glb', (gltf) => {
+        // FIX 1: Tydlig sökväg för GitHub Pages (./ i början)
+        loader.load('./ue_mannequin_retopology.glb', (gltf) => {
             let dummy = gltf.scene;
             const box = new THREE.Box3().setFromObject(dummy);
             const scale = 1.8 / (box.max.y - box.min.y); 
@@ -673,7 +660,9 @@
             const groinMesh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), yellowMat); groinMesh.position.set(0, -0.05, 0.08); groinMesh.name = "Genitalier"; taserGroup.add(groinMesh);
 
             window.log("<span style='color:#2ecc71'>3D-Gubbe inladdad!</span>");
-        }, undefined, (e) => { window.log("<span style='color:red'>Laddningsfel (GLB).</span>"); });
+        }, undefined, (e) => { 
+            window.log("<span style='color:red'>Laddningsfel (GLB). Kolla filnamnet på GitHub.</span>"); 
+        });
 
         // Placeringsmarkör
         const placementGround = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ visible: false }));
