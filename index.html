@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate Simulator v7.13</title>
+    <title>Taser 7 - Ultimate Simulator v7.14</title>
     <style>
         * { box-sizing: border-box; }
 
@@ -107,7 +107,6 @@
 
         .warning-arc { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 120px; height: 25px; background: repeating-linear-gradient(90deg, transparent, transparent 5px, #a8eb12 8px, #ffffff 12px); filter: drop-shadow(0 0 10px #a8eb12) drop-shadow(0 0 20px #a8eb12); border-radius: 10px; display: none; animation: electricity 0.05s infinite alternate; z-index: 20; }
         
-        /* Uppflyttade riktmedel (Iron sights) för att peka mot lasern */
         .sights { display: flex; justify-content: center; gap: 40px; position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 100%; z-index: 25;}
         .sight-dot { width: 12px; height: 12px; background-color: #fff; border-radius: 50%; box-shadow: 0 -2px 4px rgba(0,0,0,0.8), inset 0 -2px 4px rgba(0,0,0,0.5); border: 2px solid #222;}
         
@@ -159,6 +158,7 @@
         button.action-btn:active { transform: scale(0.98); background-color: #3d566e; }
         .btn-grid-compact { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 5px; }
         .btn-grid-compact .action-btn { margin-bottom: 0; }
+        .btn-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 5px; }
         
         .btn-trigger { background-color: #c0392b !important; border-color: #922b21 !important; font-size: 14px !important; padding: 14px !important; text-transform: uppercase; box-shadow: 0 3px 0 #7b241c; margin-top: 5px !important; margin-bottom: 12px !important; }
         .btn-trigger:active { box-shadow: 0 0 0 #7b241c; transform: translateY(3px); }
@@ -175,6 +175,7 @@
         /* HUD DYNAMISK DÖLJNING */
         #combat-controls { display: block; transition: all 0.3s ease; }
         #setup-controls { display: block; transition: all 0.3s ease; }
+        #webxr-controls { display: none; margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;}
         
         /* Göm inställningsknapparna när vi är i "Combat Mode" */
         .combat-mode-active #setup-controls { display: none; }
@@ -189,6 +190,8 @@
         body.webxr-mode #app-root { background: transparent; }
         body.webxr-mode .main-title { display: none; }
         
+        body.webxr-mode .fixed-aim-layer { display: block !important; z-index: 999999 !important; }
+        
         body.webxr-mode .viewport { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; box-shadow: none; border-radius: 0; background-color: transparent; margin: 0; z-index: 0; }
         body.webxr-mode .main-container { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 400px; padding-bottom: env(safe-area-inset-bottom, 20px); }
         
@@ -202,6 +205,11 @@
         body.webxr-mode .sim-controls { background-color: rgba(20, 30, 40, 0.45); box-shadow: none; border: 1px solid rgba(255,255,255,0.1); border-top: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
         body.webxr-mode .footer { display: none; }
         body.webxr-mode .log-box { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.2); }
+        
+        /* Aktivera WebXR-exklusiva knappar */
+        body.webxr-mode #webxr-controls { display: block; }
+        /* Göm standard WebXR-startknapp när vi redan är i det */
+        body.webxr-mode #btn-webxr { display: none; }
 
         /* Modaler */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 15px;}
@@ -263,6 +271,7 @@
             </div>
 
             <div class="sim-controls" id="sim-controls">
+                
                 <div id="combat-controls">
                     <div class="status-grid">
                         <div id="stat-cassette" class="status-box">⏏️ Kassetter ur</div>
@@ -292,6 +301,13 @@
                         <button class="action-btn btn-camera" id="btn-camera" onclick="window.toggleCamera()">📷 Kamera (AR)</button>
                         <button class="action-btn" id="btn-webxr" onclick="window.startXR()">🌐 WebXR</button>
                         <button class="action-btn btn-info" onclick="window.openModal('info-modal')">ℹ️ Lathund</button>
+                    </div>
+                </div>
+
+                <div id="webxr-controls">
+                    <div class="btn-grid-2">
+                        <button class="action-btn" style="background-color:#f39c12; border-color:#e67e22;" onclick="window.togglePlaceMode()">📍 Flytta figur</button>
+                        <button class="action-btn" style="background-color:#e74c3c; border-color:#c0392b;" onclick="window.endXRSession()">⛔ Avsluta AR</button>
                     </div>
                 </div>
 
@@ -349,7 +365,7 @@
             setTimeout(() => { alertEl.classList.remove('show'); }, 4000);
         }
 
-        window.log("Simulator v7.13 startar... <span style='color:#f1c40f;'>Sätt i batteri och ladda!</span>");
+        window.log("Simulator v7.14 startar... <span style='color:#f1c40f;'>Sätt i batteri och ladda!</span>");
 
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
         document.querySelector('.hud-overlay').addEventListener('beforexrselect', e => e.preventDefault());
@@ -397,7 +413,6 @@
             window.updateAimVisuals();
         });
 
-        // Mus-Scroll för Zoom/Avstånd (Dator)
         document.getElementById('viewport').addEventListener('wheel', (e) => {
             if (window.gyroEnabled || window.placeMode || window.xrSession) return;
             e.preventDefault();
@@ -428,7 +443,7 @@
             setTimeout(() => { document.getElementById('warn-left').classList.remove('active-press'); document.getElementById('warn-right').classList.remove('active-press'); }, 200);
         }
 
-        // ----- PLACERINGS LOGIK (ENDAST WEBXR) -----
+        // ----- PLACERINGS LOGIK -----
         window.togglePlaceMode = function() {
             if (!window.xrSession) {
                 window.log("📍 Placering är endast tillgängligt i WebXR (Äkta AR).");
@@ -436,8 +451,9 @@
             }
             window.placeMode = true; window.figureLocked = false;
             
-            document.getElementById('standard-controls').style.display = 'none';
+            document.getElementById('combat-controls').style.display = 'none';
             document.getElementById('setup-controls').style.display = 'none';
+            document.getElementById('webxr-controls').style.display = 'none';
             document.getElementById('placement-controls').style.display = 'block';
 
             if (window.taserGroup) window.taserGroup.visible = false;
@@ -474,8 +490,11 @@
             if (hint) hint.classList.remove('visible');
 
             document.getElementById('placement-controls').style.display = 'none';
-            document.getElementById('standard-controls').style.display = 'block';
-            window.updateDisplay(); // Återkallar UI uppdatering
+            document.getElementById('combat-controls').style.display = 'block';
+            document.getElementById('setup-controls').style.display = ''; 
+            document.getElementById('webxr-controls').style.display = window.xrSession ? 'block' : 'none';
+            
+            window.updateDisplay(); // Tvingar CSS att utvärdera Combat Mode igen
 
             window.log("<span style='color:#2ecc71'><b>🔒 Figuren är fastlåst!</b> Redo för insats.</span>");
         }
@@ -495,7 +514,8 @@
                     btnCamera.innerHTML = "📷 Avbryt AR"; btnCamera.classList.add('active-cam');
                     
                     if (typeof window.set3DVisibility === 'function') window.set3DVisibility(false);
-                    window.show3DModel = false; window.figureLocked = true;
+                    window.show3DModel = false;
+                    window.figureLocked = true;
                     window.log("<span style='color:#f1c40f'>Kamera AR. Sikta på en riktig person. Matematisk spridning.</span>");
                     
                 } catch (err) { window.log("<span style='color:red'>Kunde inte starta kamera.</span>"); }
@@ -532,7 +552,6 @@
                 document.body.classList.add('webxr-mode');
                 window.useCamera = false;
                 document.getElementById('camera-feed').style.display = 'none';
-                if (btnWebXR) { btnWebXR.textContent = '⛔ Avsluta WebXR'; btnWebXR.style.backgroundColor = '#e74c3c'; }
                 
                 if (typeof window.set3DVisibility === 'function') window.set3DVisibility(true);
                 window.show3DModel = true;
@@ -547,12 +566,12 @@
             if(window.renderer) { window.renderer.xr.setSession(null); window.renderer.xr.enabled = false; }
             
             document.body.classList.remove('webxr-mode');
-            const btnWebXR = document.getElementById('btn-webxr');
-            if (btnWebXR) { btnWebXR.textContent = '🌐 WebXR'; btnWebXR.style.backgroundColor = '#34495e'; }
             
             if (window.placeMode) { 
-                document.getElementById('standard-controls').style.display = 'block';
+                document.getElementById('combat-controls').style.display = 'block';
+                document.getElementById('setup-controls').style.display = '';
                 document.getElementById('placement-controls').style.display = 'none';
+                document.getElementById('webxr-controls').style.display = 'none';
                 window.placeMode = false;
             } 
             window.figureLocked = true;
@@ -562,7 +581,7 @@
         }
         window.endXRSession = async function() { if (window.xrSession) { await window.xrSession.end(); } }
 
-        // ----- GYRO MED ROBUST TILT -----
+        // ----- GYRO -----
         window.initGyro = function() {
             window.initAudio(); 
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -617,7 +636,6 @@
             let baseScale = 0.5; let scaleFactor = (3.0 / window.currentDistance) * baseScale; 
             let visualDropPx = ((window.activeChamber === 1) ? 141.7 : 40.7) * scaleFactor; 
             
-            // KLAMPA RÖDA LASERN: Förhindra att den försvinner under skärmkanten
             let maxDrop = window.innerHeight * 0.35; 
             if(visualDropPx > maxDrop) visualDropPx = maxDrop;
 
@@ -643,7 +661,6 @@
         window.updateDisplay = function() {
             if (window.arcTimer) return; window.updateAimVisuals(); 
             
-            // DYNAMISK HUD: Om vapnet är redo (Batteri + Kassett + Osäkrat) göm inställningar
             let isLoaded = (window.chamber1 === "loaded" || window.chamber2 === "loaded");
             if (window.hasBattery && isLoaded && !window.isSafe && !window.placeMode) {
                 document.getElementById('sim-controls').classList.add('combat-mode-active');
@@ -712,7 +729,7 @@
             window.initAudio();
             if(!window.hasBattery || !window.isSafe) { window.log("<span style='color:red'>Säkra vapnet</span> för att växla Dolt Läge."); return; }
             window.stealthMode = !window.stealthMode;
-            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span> (Display släckta)"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
+            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span>"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
             window.updateDisplay();
         }
 
@@ -817,7 +834,6 @@
             window.log("<span style='color:red'>Laddningsfel (GLB). Kolla filnamnet på GitHub.</span>"); 
         });
 
-        // Placeringsmarkör
         const placementGround = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ visible: false }));
         placementGround.rotation.x = -Math.PI / 2; scene.add(placementGround);
         
@@ -841,7 +857,6 @@
             let ndc1 = new THREE.Vector2(0, 0); 
             let visualDropPx = (chamber === 1) ? 141.7 : 40.7; 
             
-            // Säkerställ att raycasterns röd-laser matchar den klampade droppen
             let maxDrop = window.innerHeight * 0.35; 
             if(visualDropPx > maxDrop) visualDropPx = maxDrop;
 
@@ -928,15 +943,12 @@
                 }
             }
 
-            // ROBUST TILT-DETEKTION I WEBXR: Läser av en "gravitationsvektor"
             if (renderer.xr.isPresenting && frame && !window.isSafe && window.hasBattery && window.chamber1 !== "empty" && window.xrRefSpace) {
                 const viewerPose = frame.getViewerPose(window.xrRefSpace);
                 if (viewerPose) {
-                    // Beräkna "höger" axel lokalt på telefonen och mappa till rummet
                     const m = new THREE.Matrix4().fromArray(viewerPose.transform.matrix);
                     const rightVector = new THREE.Vector3(1, 0, 0).transformDirection(m);
                     
-                    // Om höger vektor pekar mycket uppåt eller nedåt = telefonen lutar i sidled
                     if (Math.abs(rightVector.y) > 0.6) {
                         const now = Date.now();
                         if (now - window.lastTiltTime > 1000) {
