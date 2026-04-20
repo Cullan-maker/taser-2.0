@@ -3,15 +3,21 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate AR & WebXR v7.5</title>
+    <title>Taser 7 - Ultimate AR & WebXR v7.6</title>
     <style>
         * { box-sizing: border-box; }
 
-        body { 
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+        body, html { 
+            margin: 0; padding: 0; width: 100%; height: 100%; 
             background-color: #050505; color: #ecf0f1; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            overflow-x: hidden; 
+        }
+
+        /* Dedikerad App-Root för att WebXR DOM Overlay ska fungera felfritt på alla mobiler */
+        #app-root {
             display: flex; flex-direction: column; align-items: center;
-            padding: 15px 10px; margin: 0; min-height: 100vh; overflow-x: hidden; 
+            width: 100%; min-height: 100vh; padding: 15px 10px; position: relative;
         }
 
         h1.main-title {
@@ -20,6 +26,8 @@
         }
 
         /* ----- VY FRAMÅT (MÅLBILDEN) ----- */
+        .simulator-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 400px; }
+
         .viewport {
             width: 100%; height: 320px; border: 3px solid #333; border-radius: 10px;
             position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
@@ -35,37 +43,50 @@
         .camera-feed.fail-flash, #three-canvas.fail-flash { animation: redStrobe 0.2s 3; }
         @keyframes redStrobe { 0% { filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2); } 100% { filter: none; } }
 
-        /* ----- SIKTET (FASTLÅST I MITTEN) ----- */
-        .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; /* Fix för WebXR */ }
-        .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; }
-        .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.5); }
+        /* ----- SIKTET OCH LASRARNA ----- */
+        .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 99999; }
+        .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.4); border-radius: 50%; }
+        .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.6); }
         .crosshair::before { top: 50%; left: -5px; right: -5px; height: 1px; transform: translateY(-50%); }
         .crosshair::after { left: 50%; top: -5px; bottom: -5px; width: 1px; transform: translateX(-50%); }
 
         .flashlight-beam { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; height: 450px; background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%); display: none; }
-        .laser-green { position: absolute; width: 10px; height: 10px; background-color: #00ff00; border-radius: 50%; box-shadow: 0 0 15px #00ff00, 0 0 30px #00ff00; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
-        .laser-red { position: absolute; width: 10px; height: 10px; background-color: #ff0000; border-radius: 50%; box-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000; left: 50%; transform: translateX(-50%); display: none; animation: blinkLaser 0.15s infinite alternate; transition: top 0.1s ease-out; }
-        @keyframes blinkLaser { 0% { opacity: 0.2; transform: translateX(-50%) scale(0.8); } 100% { opacity: 1; transform: translateX(-50%) scale(1.2); } }
+        
+        /* Förstärkta lasrar för AR */
+        .laser-green { position: absolute; width: 12px; height: 12px; background-color: #00ff00; border-radius: 50%; box-shadow: 0 0 15px #00ff00, 0 0 30px #00ff00, 0 0 45px #00ff00; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
+        .laser-red { position: absolute; width: 12px; height: 12px; background-color: #ff0000; border-radius: 50%; box-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000, 0 0 45px #ff0000; left: 50%; transform: translateX(-50%); display: none; animation: blinkLaser 0.15s infinite alternate; transition: top 0.1s ease-out; }
+        @keyframes blinkLaser { 0% { opacity: 0.3; transform: translateX(-50%) scale(0.8); } 100% { opacity: 1; transform: translateX(-50%) scale(1.2); } }
 
         .lightning { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; background: radial-gradient(circle, rgba(168,235,18,0.2) 0%, transparent 60%); display: none; z-index: 5; }
         .lightning::before, .lightning::after { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 4px; background: #fff; box-shadow: 0 0 15px #a8eb12, 0 0 30px #a8eb12; animation: electricity 0.05s infinite alternate; }
         .lightning::after { transform: rotate(15deg); }
+
+        /* ----- AR HIT POPUP (NYTT) ----- */
+        #ar-hit-alert {
+            position: fixed; top: 35%; left: 50%; transform: translate(-50%, -50%);
+            width: 90%; max-width: 350px; text-align: center; font-family: 'Segoe UI', sans-serif;
+            pointer-events: none; z-index: 100000; opacity: 0; transition: opacity 0.3s ease;
+            background: rgba(0,0,0,0.85); padding: 15px; border-radius: 10px; border: 2px solid #333;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.9);
+        }
+        #ar-hit-alert.show { opacity: 1; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
+        @keyframes popIn { 0% { transform: translate(-50%, -30%) scale(0.8); } 100% { transform: translate(-50%, -50%) scale(1); } }
 
         /* HUD Overlay */
         .hud-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; }
         .hud-row { display: flex; justify-content: space-between; width: 100%; }
         .place-hint {
             position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.75); color: #2ecc71; border: 1px solid #2ecc71;
-            padding: 8px 12px; border-radius: 20px; font-size: 11px; font-weight: bold;
+            background: rgba(0, 0, 0, 0.85); color: #2ecc71; border: 2px solid #2ecc71;
+            padding: 10px 15px; border-radius: 20px; font-size: 13px; font-weight: bold;
             pointer-events: none; opacity: 0; transition: opacity 0.15s ease;
-            z-index: 30; text-align: center;
+            z-index: 30; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8);
         }
         .place-hint.visible { opacity: 1; }
         
-        .target-label { color: #f1c40f; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 6px; border-radius: 3px; border: 1px solid #333; }
-        .dist-label { color: #3498db; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 6px; border-radius: 3px; border: 1px solid #333; }
-        .spread-label { color: #e67e22; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px 8px; border-radius: 3px; border: 1px solid #d35400; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .target-label { color: #f1c40f; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px 8px; border-radius: 4px; border: 1px solid #333; }
+        .dist-label { color: #3498db; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px 8px; border-radius: 4px; border: 1px solid #333; }
+        .spread-label { color: #e67e22; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.9); padding: 6px 10px; border-radius: 4px; border: 1px solid #d35400; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
         /* ----- VAPEN OCH KONTROLLER ----- */
         .main-container { display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; z-index: 50; transition: all 0.3s ease; }
@@ -144,12 +165,12 @@
 
         /* ----- WEBXR STYLING OVERRIDES ----- */
         body.webxr-mode { background: transparent; }
+        body.webxr-mode #app-root { background: transparent; }
         body.webxr-mode .main-title { display: none; }
         body.webxr-mode .viewport { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; box-shadow: none; border-radius: 0; background-color: transparent; margin: 0; z-index: 0; }
         body.webxr-mode .main-container { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 400px; padding-bottom: env(safe-area-inset-bottom, 20px); }
         body.webxr-mode .footer { display: none; }
         body.webxr-mode .sim-controls { background-color: rgba(44, 62, 80, 0.95); box-shadow: none; border: none; border-radius: 15px 15px 0 0;}
-        /* Loggen ska visas i WebXR så vi ser NMI-resultaten! */
         body.webxr-mode .log-box { display: block; border-color: rgba(255,255,255,0.2); }
 
         /* Modaler */
@@ -162,9 +183,12 @@
 </head>
 <body>
 
+  <div id="app-root">
     <div class="simulator-wrapper">
         <h1 class="main-title">TASER 7</h1>
         
+        <div id="ar-hit-alert"></div>
+
         <div class="viewport" id="viewport">
             <div id="three-canvas"></div>
             <video id="camera-feed" class="camera-feed" autoplay playsinline></video>
@@ -234,7 +258,13 @@
                     <div class="btn-grid-compact">
                         <button class="action-btn" id="btn-webxr" onclick="window.startXR()">🌐 WebXR</button>
                         <button class="action-btn" id="btn-place" onclick="window.togglePlaceMode()">📍 Flytta figur</button>
+                        <button class="action-btn" id="btn-invert" onclick="window.toggleInvertMouse()">↕️ Inv. Mus</button>
+                    </div>
+
+                    <div class="btn-grid-compact">
+                        <button class="action-btn" id="btn-toggle-3d" onclick="window.toggle3DModel()" style="display:none;">👁️ Dölj 3D</button>
                         <button class="action-btn btn-reset" onclick="window.resetSimulator()">♻️ Återställ</button>
+                        <button class="action-btn btn-info" onclick="window.openModal('info-modal')">ℹ️ Lathund</button>
                     </div>
                 </div>
 
@@ -248,6 +278,14 @@
             </div>
         </div>
         <div class="footer">&copy; Cullibrick 2026</div>
+    </div>
+  </div> <div id="info-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" onclick="window.closeModal('info-modal')">×</button>
+            <h2>Lathund: Taser 7 AR & WebXR</h2>
+            <p><strong>AR Placering:</strong> Tryck på "🌐 WebXR" eller "📷 Kamera". Menyn byts ut mot ett placeringsläge. Titta runt på golvet tills markören visar sig, och klicka sedan på "Fastställ Position" för att låsa gubben i rummet.</p>
+            <p><strong>Rörelse (Dator):</strong> Scrolla med mushjulet för att gå fram/bak.</p>
+        </div>
     </div>
 
     <script type="importmap">
@@ -265,10 +303,23 @@
             const entry = document.createElement('div');
             entry.className = 'log-entry'; entry.innerHTML = `> ${msg}`;
             logBox.prepend(entry);
-            // Auto-scroll till toppen
             logBox.scrollTop = 0;
         }
-        window.log("Simulator v7.5 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
+
+        window.showHitAlert = function(success, text) {
+            const alertEl = document.getElementById('ar-hit-alert');
+            if (success) {
+                alertEl.style.borderColor = '#2ecc71';
+                alertEl.innerHTML = `<span style="color:#2ecc71; font-size:26px;">NMI UPPNÅDD!</span><br><span style="font-size:14px; color:#fff;">${text}</span>`;
+            } else {
+                alertEl.style.borderColor = '#e74c3c';
+                alertEl.innerHTML = `<span style="color:#e74c3c; font-size:26px;">NMI MISSLYCKADES!</span><br><span style="font-size:14px; color:#fff;">${text}</span>`;
+            }
+            alertEl.classList.add('show');
+            setTimeout(() => { alertEl.classList.remove('show'); }, 4000);
+        }
+
+        window.log("Simulator v7.6 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
 
         // FÖRHINDRA ATT KLICK PÅ UI SKICKAS TILL 3D/WEBXR MILJÖN!
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
@@ -317,6 +368,15 @@
             window.updateAimVisuals();
         });
 
+        // Återställd Mus-Scroll för Zoom/Gå framåt
+        document.getElementById('viewport').addEventListener('wheel', (e) => {
+            if (window.gyroEnabled || window.placeMode || window.xrSession) return;
+            e.preventDefault();
+            window.currentDistance += e.deltaY * 0.005;
+            window.currentDistance = Math.max(1.0, Math.min(15.0, window.currentDistance));
+            window.updateAimVisuals();
+        }, {passive: false});
+
         // Ljud
         window.initAudio = function() {
             if (!isAudioInit) { isAudioInit = true; try { const AudioContext = window.AudioContext || window.webkitAudioContext; if (AudioContext) { audioCtx = new AudioContext(); } } catch (e) {} }
@@ -351,7 +411,7 @@
 
             const hint = document.getElementById('place-hint');
             if (hint) {
-                hint.innerHTML = window.xrSession ? "Peka mot golvet och vänta på markör" : "Klicka på golvet";
+                hint.innerHTML = window.xrSession ? "Peka mot golvet och vänta på markör" : "Klicka på golvet (Svart/Kamera)";
                 hint.classList.add('visible');
             }
 
@@ -374,7 +434,7 @@
                 window.taserGroup.position.y += 0.9; 
                 window.taserGroup.visible = true;
             } else if (window.taserGroup) {
-                window.taserGroup.visible = true; 
+                window.taserGroup.visible = true; // Fallback
             }
             
             if (window.placeMarker) window.placeMarker.visible = false;
@@ -422,7 +482,8 @@
             navigator.xr.isSessionSupported('immersive-ar').then((canHit) => {
                 if (!canHit) { window.log("<span style='color:red'>WebXR AR inte tillgängligt.</span>"); return Promise.reject('no-xr'); }
                 if (window.xrSession) { return window.endXRSession().then(() => Promise.reject('session-ended')); }
-                return navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test', 'local-floor'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.body } });
+                // FIX FÖR DOM OVERLAY: Bind till #app-root
+                return navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test', 'local-floor'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.getElementById('app-root') } });
             }).then((session) => {
                 if (!session) return;
                 window.renderer.xr.enabled = true;
@@ -600,7 +661,17 @@
                 if (window.activeChamber === 1) window.chamber1 = "fired"; else window.chamber2 = "fired";
                 if(typeof window.onDartsFired === 'function') {
                     let nmiResult = window.onDartsFired(window.activeChamber);
-                    if(nmiResult.success) { window.log(`<span style='color:#2ecc71; font-weight:bold;'>NMI UPPNÅDD!</span> ${nmiResult.reason}`); window.runCycle("NMI påbörjad...", true); } else { window.log(`<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES!</span> ${nmiResult.reason}`); document.getElementById('three-canvas').classList.remove('fail-flash'); void document.getElementById('three-canvas').offsetWidth; document.getElementById('three-canvas').classList.add('fail-flash'); window.updateDisplay(); }
+                    
+                    // NYTT: Visa resultatet stort på skärmen!
+                    if(nmiResult.success) { 
+                        window.log(`<span style='color:#2ecc71; font-weight:bold;'>NMI UPPNÅDD!</span> ${nmiResult.reason}`); 
+                        window.showHitAlert(true, nmiResult.reason);
+                        window.runCycle("NMI påbörjad...", true); 
+                    } else { 
+                        window.log(`<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES!</span> ${nmiResult.reason}`); 
+                        window.showHitAlert(false, nmiResult.reason);
+                        document.getElementById('three-canvas').classList.remove('fail-flash'); void document.getElementById('three-canvas').offsetWidth; document.getElementById('three-canvas').classList.add('fail-flash'); window.updateDisplay(); 
+                    }
                 }
                 let nextChamber = window.activeChamber === 1 ? 2 : 1;
                 if ((nextChamber === 1 ? window.chamber1 : window.chamber2) === "loaded") { window.activeChamber = nextChamber; window.log(`Växlar automatiskt till laddad kammare (${window.activeChamber}).`); }
@@ -641,7 +712,6 @@
         let taserGroup = new THREE.Group(); scene.add(taserGroup); window.taserGroup = taserGroup;
         const loader = new GLTFLoader();
         
-        // FIX 1: Tydlig sökväg för GitHub Pages (./ i början)
         loader.load('./ue_mannequin_retopology.glb', (gltf) => {
             let dummy = gltf.scene;
             const box = new THREE.Box3().setFromObject(dummy);
