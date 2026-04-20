@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate Simulator v7.14</title>
+    <title>Taser 7 - Ultimate Simulator v7.16</title>
     <style>
         * { box-sizing: border-box; }
 
@@ -177,7 +177,6 @@
         #setup-controls { display: block; transition: all 0.3s ease; }
         #webxr-controls { display: none; margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;}
         
-        /* Göm inställningsknapparna när vi är i "Combat Mode" */
         .combat-mode-active #setup-controls { display: none; }
 
         /* ----- NYTT PLACERINGS-UI ----- */
@@ -206,9 +205,7 @@
         body.webxr-mode .footer { display: none; }
         body.webxr-mode .log-box { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.2); }
         
-        /* Aktivera WebXR-exklusiva knappar */
         body.webxr-mode #webxr-controls { display: block; }
-        /* Göm standard WebXR-startknapp när vi redan är i det */
         body.webxr-mode #btn-webxr { display: none; }
 
         /* Modaler */
@@ -305,7 +302,8 @@
                 </div>
 
                 <div id="webxr-controls">
-                    <div class="btn-grid-2">
+                    <div class="btn-grid-compact">
+                        <button class="action-btn" style="background-color:#2980b9; border-color:#1f618d;" onclick="window.resetWeaponXR()">🔄 Återställ Vapen</button>
                         <button class="action-btn" style="background-color:#f39c12; border-color:#e67e22;" onclick="window.togglePlaceMode()">📍 Flytta figur</button>
                         <button class="action-btn" style="background-color:#e74c3c; border-color:#c0392b;" onclick="window.endXRSession()">⛔ Avsluta AR</button>
                     </div>
@@ -328,9 +326,9 @@
         <div class="modal-content">
             <button class="modal-close" onclick="window.closeModal('info-modal')">×</button>
             <h2>Lathund: Taser 7 Simulator</h2>
-            <p><strong>Insatsläge:</strong> När du satt i batteri, laddat kassetter och osäkrat vapnet försvinner alla onödiga inställningar från skärmen så att du får en ren "Combat HUD".</p>
-            <p><strong>WebXR Tilt:</strong> Tilten fungerar nu perfekt i AR! Luta telefonens kortsida kraftigt mot golvet (>45 grader) för att byta kammare.</p>
-            <p><strong>Rörelse (Dator):</strong> Scrolla med mushjulet för att ställa in avstånd och se hur lasern klättrar.</p>
+            <p><strong>WebXR Återställ:</strong> En ny "Återställ Vapen"-knapp laddar om kassetter och ställer upp figuren igen direkt inifrån AR-läget.</p>
+            <p><strong>WebXR Tilt:</strong> Tilten fungerar nu klockrent. Vinkla bara telefonen i sidled (som en ratt) för att byta kassett.</p>
+            <p><strong>Ragdoll-effekt:</strong> När du får en godkänd NMI faller figuren. Klicka på 'Återställ Vapen' eller dra ut/in kassetten för att resa upp honom.</p>
         </div>
     </div>
 
@@ -365,7 +363,7 @@
             setTimeout(() => { alertEl.classList.remove('show'); }, 4000);
         }
 
-        window.log("Simulator v7.14 startar... <span style='color:#f1c40f;'>Sätt i batteri och ladda!</span>");
+        window.log("Simulator v7.16 startar... <span style='color:#f1c40f;'>Sätt i batteri och ladda!</span>");
 
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
         document.querySelector('.hud-overlay').addEventListener('beforexrselect', e => e.preventDefault());
@@ -385,6 +383,8 @@
         window.currentDistance = 3.0; window.cameraAngle = 0; window.aimX = 50; window.aimY = 50; 
         window.gyroEnabled = false; window.lastTiltTime = 0;
         
+        window.isFallen = false;
+
         let audioCtx = null; let isAudioInit = false; let soundInterval = null;
 
         window.addEventListener('keydown', function(event) {
@@ -421,7 +421,6 @@
             window.updateAimVisuals();
         }, {passive: false});
 
-        // Ljud
         window.initAudio = function() {
             if (!isAudioInit) { isAudioInit = true; try { const AudioContext = window.AudioContext || window.webkitAudioContext; if (AudioContext) { audioCtx = new AudioContext(); } } catch (e) {} }
             if (audioCtx && audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch(e) {} }
@@ -443,12 +442,43 @@
             setTimeout(() => { document.getElementById('warn-left').classList.remove('active-press'); document.getElementById('warn-right').classList.remove('active-press'); }, 200);
         }
 
+        // ----- RAGDOLL -----
+        window.fallDown = function() {
+            if(window.isFallen) return;
+            window.isFallen = true;
+            let currentX = 0;
+            const targetX = -Math.PI / 2 + 0.1; 
+            const fallInt = setInterval(() => {
+                currentX -= 0.08;
+                if(window.fallPivot) window.fallPivot.rotation.x = currentX;
+                if(currentX <= targetX) {
+                    if(window.fallPivot) window.fallPivot.rotation.x = targetX;
+                    clearInterval(fallInt);
+                }
+            }, 16);
+        }
+
+        window.getUp = function() {
+            if(!window.isFallen) return;
+            let currentX = window.fallPivot ? window.fallPivot.rotation.x : 0;
+            const riseInt = setInterval(() => {
+                currentX += 0.08;
+                if(window.fallPivot) window.fallPivot.rotation.x = currentX;
+                if(currentX >= 0) {
+                    if(window.fallPivot) window.fallPivot.rotation.x = 0;
+                    window.isFallen = false;
+                    clearInterval(riseInt);
+                }
+            }, 16);
+        }
+
         // ----- PLACERINGS LOGIK -----
         window.togglePlaceMode = function() {
             if (!window.xrSession) {
                 window.log("📍 Placering är endast tillgängligt i WebXR (Äkta AR).");
                 return;
             }
+            if(window.getUp) window.getUp(); 
             window.placeMode = true; window.figureLocked = false;
             
             document.getElementById('combat-controls').style.display = 'none';
@@ -494,12 +524,12 @@
             document.getElementById('setup-controls').style.display = ''; 
             document.getElementById('webxr-controls').style.display = window.xrSession ? 'block' : 'none';
             
-            window.updateDisplay(); // Tvingar CSS att utvärdera Combat Mode igen
+            window.updateDisplay(); 
 
             window.log("<span style='color:#2ecc71'><b>🔒 Figuren är fastlåst!</b> Redo för insats.</span>");
         }
 
-        // ----- KAMERA AR (INGEN PLACERING) -----
+        // ----- KAMERA AR -----
         window.toggleCamera = async function() {
             const cameraFeed = document.getElementById('camera-feed');
             const btnCamera = document.getElementById('btn-camera');
@@ -526,7 +556,8 @@
                 
                 if (typeof window.set3DVisibility === 'function') window.set3DVisibility(true);
                 window.show3DModel = true;
-                if(window.taserGroup) window.taserGroup.position.set(0, -0.9, 0); 
+                if(window.getUp) window.getUp();
+                if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); 
                 window.log("Återgått till svart bakgrund. Statisk figur.");
             }
         }
@@ -552,9 +583,11 @@
                 document.body.classList.add('webxr-mode');
                 window.useCamera = false;
                 document.getElementById('camera-feed').style.display = 'none';
+                if (btnWebXR) { btnWebXR.textContent = '⛔ Avsluta WebXR'; btnWebXR.style.backgroundColor = '#e74c3c'; }
                 
                 if (typeof window.set3DVisibility === 'function') window.set3DVisibility(true);
                 window.show3DModel = true;
+                if(window.getUp) window.getUp();
                 window.togglePlaceMode(); 
                 
                 session.addEventListener('end', window.onXRSessionEnded);
@@ -566,20 +599,40 @@
             if(window.renderer) { window.renderer.xr.setSession(null); window.renderer.xr.enabled = false; }
             
             document.body.classList.remove('webxr-mode');
+            const btnWebXR = document.getElementById('btn-webxr');
+            if (btnWebXR) { btnWebXR.textContent = '🌐 WebXR'; btnWebXR.style.backgroundColor = '#34495e'; }
             
             if (window.placeMode) { 
                 document.getElementById('combat-controls').style.display = 'block';
                 document.getElementById('setup-controls').style.display = '';
                 document.getElementById('placement-controls').style.display = 'none';
-                document.getElementById('webxr-controls').style.display = 'none';
                 window.placeMode = false;
             } 
+            document.getElementById('webxr-controls').style.display = 'none';
+            
             window.figureLocked = true;
             window.updateDisplay();
-            if(window.taserGroup) window.taserGroup.position.set(0, -0.9, 0); 
+            if(window.getUp) window.getUp();
+            if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); 
             window.log("WebXR-session avslutad.");
         }
         window.endXRSession = async function() { if (window.xrSession) { await window.xrSession.end(); } }
+
+        // ----- NY: ÅTERSTÄLL VAPEN I WEBXR -----
+        window.resetWeaponXR = function() {
+            window.chamber1 = "loaded";
+            window.chamber2 = "loaded";
+            window.activeChamber = 1;
+            const cEl = document.getElementById('stat-cassette');
+            if(cEl) {
+                cEl.textContent = "⏏️ Kassetter i"; 
+                cEl.classList.add('ok');
+            }
+            document.querySelectorAll('.dart-spark').forEach(el => el.remove());
+            if(window.getUp) window.getUp(); // Res figuren
+            window.updateDisplay();
+            window.log("Vapnet och figuren har återställts.");
+        }
 
         // ----- GYRO -----
         window.initGyro = function() {
@@ -690,6 +743,7 @@
                 window.chamber1 = "empty"; window.chamber2 = "empty"; window.activeChamber = 1; 
                 cEl.textContent = "⏏️ Kassetter ur"; cEl.classList.remove('ok'); window.log("Kassetter urtagna."); 
                 document.querySelectorAll('.dart-spark').forEach(el => el.remove());
+                if(window.getUp) window.getUp();
             }
             window.updateDisplay();
         }
@@ -763,6 +817,9 @@
                         window.log(`<span style='color:#2ecc71; font-weight:bold;'>NMI UPPNÅDD!</span> ${nmiResult.reason}`); 
                         window.showHitAlert(true, nmiResult.reason);
                         window.runCycle("NMI påbörjad...", true); 
+                        
+                        if(window.fallDown) window.fallDown();
+
                     } else { 
                         window.log(`<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES!</span> ${nmiResult.reason}`); 
                         window.showHitAlert(false, nmiResult.reason);
@@ -778,7 +835,7 @@
         window.pressSingleWarning = function() { window.initAudio(); animateWarningButtons(); if (!window.hasBattery || window.isSafe || window.arcTimer) return; window.runCycle(window.displayState === "FUNK_MODE" ? "Testar varningsbåge..." : "Skarp varningsbåge!", false); }
         window.pressDualWarning = function() { window.initAudio(); animateWarningButtons(); if (!window.hasBattery || !window.isSafe) return; window.log("Display (BOOT) aktiv i 5s."); window.displayState = "BOOT"; window.updateDisplay(); setTimeout(() => { if (window.displayState === "BOOT" && window.isSafe) { window.displayState = "OFF"; window.updateDisplay(); } }, 5000); }
         window.tiltWeapon = function() { window.initAudio(); if (!window.hasBattery || window.isSafe || window.chamber1 === "empty") return; window.activeChamber = window.activeChamber === 1 ? 2 : 1; window.log(`Växlar till Kammare ${window.activeChamber}.`); window.updateDisplay(); }
-        window.performKontaktstot = function() { window.initAudio(); if(window.isSafe || window.arcTimer) return; window.log("<span style='color:#e67e22; font-weight:bold;'>KONTAKTSTÖT!</span>"); window.runCycle("NMI påbörjad via Kontaktstöt...", true); }
+        window.performKontaktstot = function() { window.initAudio(); if(window.isSafe || window.arcTimer) return; window.log("<span style='color:#e67e22; font-weight:bold;'>KONTAKTSTÖT!</span>"); window.runCycle("NMI påbörjad via Kontaktstöt...", true); if(window.fallDown) window.fallDown();}
         window.resetSimulator = function() { window.figureLocked = false; location.reload(); }
 
         window.updateDisplay(); // Init
@@ -806,28 +863,31 @@
         const fillLight = new THREE.DirectionalLight(0xffffff, 0.5); fillLight.position.set(0, 0, -5); scene.add(fillLight);
 
         let taserGroup = new THREE.Group(); scene.add(taserGroup); window.taserGroup = taserGroup;
-        const loader = new GLTFLoader();
         
-        window.set3DVisibility = function(isVisible) { 
-            taserGroup.visible = isVisible; 
-        };
+        const fallPivot = new THREE.Group();
+        fallPivot.position.set(0, -0.9, 0);
+        taserGroup.add(fallPivot);
+        window.fallPivot = fallPivot;
+
+        const loader = new GLTFLoader();
+        window.set3DVisibility = function(isVisible) { taserGroup.visible = isVisible; };
 
         loader.load('./ue_mannequin_retopology.glb', (gltf) => {
             let dummy = gltf.scene;
             const box = new THREE.Box3().setFromObject(dummy);
             const scale = 1.8 / (box.max.y - box.min.y); 
             dummy.scale.set(scale, scale, scale);
-            dummy.position.set(0, -0.9, 0);
+            dummy.position.set(0, 0.9, 0); 
 
             dummy.traverse((child) => {
                 if (child.isMesh) { child.material = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 0.6, metalness: 0.2 }); child.name = "Godkand_Zon"; }
             });
-            taserGroup.add(dummy);
+            fallPivot.add(dummy);
 
             const yellowMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.8, emissive: 0xf1c40f, emissiveIntensity: 0.3 });
-            const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16), yellowMat); headMesh.position.set(0, 0.75, 0.0); headMesh.name = "Huvud/Hals"; taserGroup.add(headMesh);
-            const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.2), yellowMat); chestMesh.position.set(0, 0.45, 0.08); chestMesh.name = "Hjärttrakten"; taserGroup.add(chestMesh);
-            const groinMesh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), yellowMat); groinMesh.position.set(0, -0.05, 0.08); groinMesh.name = "Genitalier"; taserGroup.add(groinMesh);
+            const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16), yellowMat); headMesh.position.set(0, 1.65, 0.0); headMesh.name = "Huvud/Hals"; fallPivot.add(headMesh);
+            const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.2), yellowMat); chestMesh.position.set(0, 1.35, 0.08); chestMesh.name = "Hjärttrakten"; fallPivot.add(chestMesh);
+            const groinMesh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), yellowMat); groinMesh.position.set(0, 0.85, 0.08); groinMesh.name = "Genitalier"; fallPivot.add(groinMesh);
 
             window.log("<span style='color:#2ecc71'>3D-Gubbe inladdad!</span>");
         }, undefined, (e) => { 
@@ -943,18 +1003,15 @@
                 }
             }
 
-            if (renderer.xr.isPresenting && frame && !window.isSafe && window.hasBattery && window.chamber1 !== "empty" && window.xrRefSpace) {
-                const viewerPose = frame.getViewerPose(window.xrRefSpace);
-                if (viewerPose) {
-                    const m = new THREE.Matrix4().fromArray(viewerPose.transform.matrix);
-                    const rightVector = new THREE.Vector3(1, 0, 0).transformDirection(m);
-                    
-                    if (Math.abs(rightVector.y) > 0.6) {
-                        const now = Date.now();
-                        if (now - window.lastTiltTime > 1000) {
-                            window.tiltWeapon();
-                            window.lastTiltTime = now;
-                        }
+            // ROBUST TILT FÖR WEBXR - ANVÄNDER CAMERA ROLL
+            if (renderer.xr.isPresenting && frame && !window.isSafe && window.hasBattery && window.chamber1 !== "empty") {
+                const euler = new THREE.Euler().setFromQuaternion(camera.quaternion, 'ZXY');
+                // euler.z motsvarar "roll" (lutning som en ratt)
+                if (Math.abs(euler.z) > 0.7) { 
+                    const now = Date.now();
+                    if (now - window.lastTiltTime > 1000) {
+                        window.tiltWeapon();
+                        window.lastTiltTime = now;
                     }
                 }
             }
