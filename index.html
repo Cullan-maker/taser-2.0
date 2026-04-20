@@ -3,20 +3,15 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate Simulator v7.18</title>
+    <title>Taser 7 - Ultimate AR & WebXR v7.5</title>
     <style>
         * { box-sizing: border-box; }
 
-        body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100dvh; 
-            background-color: #050505; color: #ecf0f1; 
+        body { 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
-            overflow-x: hidden; 
-        }
-
-        #app-root {
+            background-color: #050505; color: #ecf0f1; 
             display: flex; flex-direction: column; align-items: center;
-            width: 100%; min-height: 100dvh; padding: 15px 10px; position: relative;
+            padding: 15px 10px; margin: 0; min-height: 100vh; overflow-x: hidden; 
         }
 
         h1.main-title {
@@ -25,15 +20,13 @@
         }
 
         /* ----- VY FRAMÅT (MÅLBILDEN) ----- */
-        .simulator-wrapper { display: flex; flex-direction: column; align-items: center; width: 100%; max-width: 400px; }
-
         .viewport {
             width: 100%; height: 320px; border: 3px solid #333; border-radius: 10px;
             position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
             background-color: #111; cursor: crosshair; touch-action: none; margin-bottom: 15px; transition: all 0.3s ease;
         }
 
-        #three-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; outline: none; }
+        #three-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
         .camera-feed { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none; }
 
         .camera-feed.flash, #three-canvas.flash { animation: strobe 0.1s infinite alternate; }
@@ -42,75 +35,47 @@
         .camera-feed.fail-flash, #three-canvas.fail-flash { animation: redStrobe 0.2s 3; }
         @keyframes redStrobe { 0% { filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2); } 100% { filter: none; } }
 
-        /* ----- SIKTET OCH LASRARNA ----- */
-        .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 999999; }
-        .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.4); border-radius: 50%; }
-        .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.6); }
+        /* ----- SIKTET (FASTLÅST I MITTEN) ----- */
+        .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; }
+        .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.5); }
         .crosshair::before { top: 50%; left: -5px; right: -5px; height: 1px; transform: translateY(-50%); }
         .crosshair::after { left: 50%; top: -5px; bottom: -5px; width: 1px; transform: translateX(-50%); }
 
         .flashlight-beam { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; height: 450px; background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%); display: none; }
-        
         .laser-green { position: absolute; width: 10px; height: 10px; background-color: #00ff00; border-radius: 50%; box-shadow: 0 0 15px #00ff00, 0 0 30px #00ff00; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
         .laser-red { position: absolute; width: 10px; height: 10px; background-color: #ff0000; border-radius: 50%; box-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000; left: 50%; transform: translateX(-50%); display: none; animation: blinkLaser 0.15s infinite alternate; transition: top 0.1s ease-out; }
-        @keyframes blinkLaser { 0% { opacity: 0.3; transform: translateX(-50%) scale(0.8); } 100% { opacity: 1; transform: translateX(-50%) scale(1.2); } }
+        @keyframes blinkLaser { 0% { opacity: 0.2; transform: translateX(-50%) scale(0.8); } 100% { opacity: 1; transform: translateX(-50%) scale(1.2); } }
 
         .lightning { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; background: radial-gradient(circle, rgba(168,235,18,0.2) 0%, transparent 60%); display: none; z-index: 5; }
         .lightning::before, .lightning::after { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 4px; background: #fff; box-shadow: 0 0 15px #a8eb12, 0 0 30px #a8eb12; animation: electricity 0.05s infinite alternate; }
         .lightning::after { transform: rotate(15deg); }
-
-        /* ----- AR HIT POPUP ----- */
-        #ar-hit-alert {
-            position: fixed; top: 35%; left: 50%; transform: translate(-50%, -50%);
-            width: 90%; max-width: 350px; text-align: center; font-family: 'Segoe UI', sans-serif;
-            pointer-events: none; z-index: 100000; opacity: 0; transition: opacity 0.3s ease;
-            background: rgba(0,0,0,0.85); padding: 15px; border-radius: 10px; border: 2px solid #333;
-            box-shadow: 0 10px 30px rgba(0,0,0,0.9);
-        }
-        #ar-hit-alert.show { opacity: 1; animation: popIn 0.4s cubic-bezier(0.175, 0.885, 0.32, 1.275); }
-        @keyframes popIn { 0% { transform: translate(-50%, -30%) scale(0.8); } 100% { transform: translate(-50%, -50%) scale(1); } }
 
         /* HUD Overlay */
         .hud-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; }
         .hud-row { display: flex; justify-content: space-between; width: 100%; }
         .place-hint {
             position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
-            background: rgba(0, 0, 0, 0.85); color: #2ecc71; border: 2px solid #2ecc71;
-            padding: 10px 15px; border-radius: 20px; font-size: 13px; font-weight: bold;
+            background: rgba(0, 0, 0, 0.75); color: #2ecc71; border: 1px solid #2ecc71;
+            padding: 8px 12px; border-radius: 20px; font-size: 11px; font-weight: bold;
             pointer-events: none; opacity: 0; transition: opacity 0.15s ease;
-            z-index: 30; text-align: center; box-shadow: 0 5px 15px rgba(0,0,0,0.8);
+            z-index: 30; text-align: center;
         }
         .place-hint.visible { opacity: 1; }
         
-        .target-label { color: #f1c40f; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px 8px; border-radius: 4px; border: 1px solid #333; }
-        .dist-label { color: #3498db; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px 8px; border-radius: 4px; border: 1px solid #333; }
-        .spread-label { color: #e67e22; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.9); padding: 6px 10px; border-radius: 4px; border: 1px solid #d35400; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+        .target-label { color: #f1c40f; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 6px; border-radius: 3px; border: 1px solid #333; }
+        .dist-label { color: #3498db; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 6px; border-radius: 3px; border: 1px solid #333; }
+        .spread-label { color: #e67e22; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px 8px; border-radius: 3px; border: 1px solid #d35400; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
         /* ----- VAPEN OCH KONTROLLER ----- */
         .main-container { display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; z-index: 50; transition: all 0.3s ease; }
 
-        .taser-device { 
-            width: 300px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%); 
-            border-radius: 40px 40px 0 0; 
-            border: 2px solid #111; border-bottom: none;
-            box-shadow: 0 -5px 15px rgba(0,0,0,0.5), inset 0 5px 15px rgba(255,255,255,0.1); 
-            position: relative; padding-bottom: 10px; z-index: 2; margin-bottom: 0;
-            transition: all 0.3s ease;
-        }
-        
-        .sim-controls { 
-            width: 300px; background-color: #2c3e50; padding: 15px 10px 10px 10px; 
-            border-radius: 0 0 15px 15px; box-shadow: 0 15px 25px rgba(0,0,0,0.8); 
-            border: 2px solid #111; border-top: none; 
-            position: relative; z-index: 1; margin-top: 0; transition: all 0.3s ease;
-        }
-
+        .taser-device { width: 300px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%); border-radius: 40px 40px 10px 10px; box-shadow: 0 15px 30px rgba(0,0,0,0.9), inset 0 5px 15px rgba(255,255,255,0.1); position: relative; padding-bottom: 15px; border: 2px solid #111; z-index: 2; margin-top: -10px; }
         .warning-arc { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 120px; height: 25px; background: repeating-linear-gradient(90deg, transparent, transparent 5px, #a8eb12 8px, #ffffff 12px); filter: drop-shadow(0 0 10px #a8eb12) drop-shadow(0 0 20px #a8eb12); border-radius: 10px; display: none; animation: electricity 0.05s infinite alternate; z-index: 20; }
+        .sights { display: flex; justify-content: center; gap: 40px; padding-top: 10px; }
+        .sight-dot { width: 10px; height: 10px; background-color: #fff; border-radius: 50%; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.5); }
         
-        .sights { display: flex; justify-content: center; gap: 40px; position: absolute; top: -6px; left: 50%; transform: translateX(-50%); width: 100%; z-index: 25;}
-        .sight-dot { width: 12px; height: 12px; background-color: #fff; border-radius: 50%; box-shadow: 0 -2px 4px rgba(0,0,0,0.8), inset 0 -2px 4px rgba(0,0,0,0.5); border: 2px solid #222;}
-        
-        .display-bezel { background-color: #111; margin: 15px auto; width: 180px; height: 70px; border-radius: 10px; border: 3px solid #000; display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 15px rgba(0,0,0,0.9); margin-top: 20px;}
+        .display-bezel { background-color: #111; margin: 15px auto; width: 180px; height: 70px; border-radius: 10px; border: 3px solid #000; display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 15px rgba(0,0,0,0.9); }
         .display-screen { width: 160px; height: 50px; background-color: #050505; color: #ffff00; font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: bold; display: flex; justify-content: center; align-items: center; border-radius: 5px; transition: all 0.2s; text-align: center; }
         .display-screen.inverted { background-color: #ffff00; color: #050505; }
         .display-screen.dimmed { opacity: 0.3; }
@@ -153,81 +118,59 @@
         .safety-switch.unsafe::after { left: 42px; }
         .safety-label { text-align: center; font-weight: bold; margin-top: 6px; color: #111; font-size: 13px; }
 
-        /* KNAPPAR */
-        button.action-btn { width: 100%; background-color: #34495e; color: white; border: 1px solid #1a252f; padding: 10px 4px; margin-bottom: 5px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 10px; touch-action: manipulation; transition: 0.1s; }
-        button.action-btn:active { transform: scale(0.98); background-color: #3d566e; }
-        .btn-grid-compact { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 5px; }
-        .btn-grid-compact .action-btn { margin-bottom: 0; }
-        .btn-grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 5px; margin-bottom: 5px; }
+        /* ----- KOMPAKT KONTROLLPANEL ----- */
+        .sim-controls { width: 290px; background-color: #2c3e50; padding: 30px 10px 10px 10px; border-radius: 0 0 15px 15px; box-shadow: 0 15px 25px rgba(0,0,0,0.8); margin-top: -20px; border: 2px solid #1a252f; border-top: none; position: relative; z-index: 1; transition: all 0.3s ease;}
         
-        .btn-trigger { background-color: #c0392b !important; border-color: #922b21 !important; font-size: 14px !important; padding: 14px !important; text-transform: uppercase; box-shadow: 0 3px 0 #7b241c; margin-top: 5px !important; margin-bottom: 12px !important; }
+        button.action-btn { width: 100%; background-color: #34495e; color: white; border: 1px solid #1a252f; padding: 8px 4px; margin-bottom: 4px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 10px; touch-action: manipulation; transition: 0.1s; }
+        button.action-btn:active { transform: scale(0.98); background-color: #3d566e; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 4px; }
+        .btn-grid-compact { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 4px; }
+        .btn-grid .action-btn, .btn-grid-compact .action-btn { margin-bottom: 0; }
+        .btn-trigger { background-color: #c0392b !important; border-color: #922b21 !important; font-size: 14px !important; padding: 14px !important; text-transform: uppercase; box-shadow: 0 3px 0 #7b241c; margin-top: 5px !important; margin-bottom: 10px !important; }
         .btn-trigger:active { box-shadow: 0 0 0 #7b241c; transform: translateY(3px); }
+        .btn-warn { border-color: #f1c40f !important; color: #f1c40f !important; }
         .btn-info { background-color: #2980b9 !important; border-color: #1f618d !important; margin-bottom: 6px !important; font-size: 10px !important; padding: 6px !important;}
         
-        .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 8px; }
-        .status-box { background: #111; padding: 6px 4px; text-align: center; border-radius: 3px; font-size: 10px; font-weight: bold; border: 1px solid #e74c3c; color: #e74c3c;}
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 6px; }
+        .status-box { background: #111; padding: 4px; text-align: center; border-radius: 3px; font-size: 9px; font-weight: bold; border: 1px solid #e74c3c; color: #e74c3c;}
         .status-box.ok { border-color: #27ae60; color: #27ae60; }
         .status-box.stealth { border-color: #9b59b6; color: #9b59b6; grid-column: span 2;}
         .btn-kontaktstot { background-color: #e67e22 !important; border-color: #d35400 !important; font-size: 12px !important; padding: 10px !important; display: none; box-shadow: 0 3px 0 #ba4a00; margin-bottom: 10px !important;}
         .btn-kontaktstot:active { box-shadow: 0 0 0 #ba4a00; transform: translateY(3px); }
-        .log-box { background-color: #050505; color: #00ff00; font-family: monospace; font-size: 10px; height: 65px; overflow-y: auto; padding: 8px; border-radius: 5px; margin-top: 8px; border: 1px solid #222;}
+        .log-box { background-color: #050505; color: #00ff00; font-family: monospace; font-size: 9px; height: 60px; overflow-y: auto; padding: 6px; border-radius: 5px; margin-top: 8px; border: 1px solid #222;}
 
-        /* HUD DYNAMISK DÖLJNING */
-        #combat-controls { display: block; transition: all 0.3s ease; }
-        #setup-controls { display: block; transition: all 0.3s ease; }
-        #webxr-controls { display: none; margin-top: 5px; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 10px;}
-        
-        .combat-mode-active #setup-controls { display: none; }
-
-        /* ----- NYTT PLACERINGS-UI ----- */
+        /* ----- PLACERINGS-UI ----- */
         #placement-controls { display: none; text-align: center; padding-top: 10px; }
         .btn-confirm { width: 100%; padding: 15px; background: #27ae60 !important; color: white; font-weight: bold; font-size: 14px; border: 2px solid #2ecc71 !important; border-radius: 8px; cursor: pointer; text-transform: uppercase; box-shadow: 0 3px 0 #219653; margin-bottom: 10px;}
         .btn-confirm:active { background: #219653 !important; transform: translateY(3px); box-shadow: 0 0 0 #219653;}
 
         /* ----- WEBXR STYLING OVERRIDES ----- */
         body.webxr-mode { background: transparent; }
-        body.webxr-mode #app-root { background: transparent; }
         body.webxr-mode .main-title { display: none; }
-        
-        body.webxr-mode .fixed-aim-layer { display: block !important; z-index: 999999 !important; }
-        
         body.webxr-mode .viewport { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; box-shadow: none; border-radius: 0; background-color: transparent; margin: 0; z-index: 0; }
         body.webxr-mode .main-container { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 400px; padding-bottom: env(safe-area-inset-bottom, 20px); }
-        
-        body.webxr-mode .taser-device { 
-            transform: scale(0.8) translateY(30px); 
-            margin-bottom: -10px; 
-            background: linear-gradient(to bottom, rgba(51, 51, 51, 0.7) 0%, rgba(34, 34, 34, 0.7) 40%, rgba(225, 192, 40, 0.7) 40%, rgba(241, 196, 15, 0.7) 100%); 
-            border-color: rgba(17, 17, 17, 0.5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); box-shadow: none; 
-        }
-        
-        body.webxr-mode .sim-controls { background-color: rgba(20, 30, 40, 0.45); box-shadow: none; border: 1px solid rgba(255,255,255,0.1); border-top: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
         body.webxr-mode .footer { display: none; }
-        body.webxr-mode .log-box { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.2); }
-        
-        body.webxr-mode #webxr-controls { display: block; }
-        body.webxr-mode #btn-webxr { display: none; }
+        body.webxr-mode .sim-controls { background-color: rgba(44, 62, 80, 0.95); box-shadow: none; border: none; border-radius: 15px 15px 0 0;}
+        body.webxr-mode .log-box { display: none; }
 
         /* Modaler */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 15px;}
         .modal-content { background: #2c3e50; width: 100%; max-width: 500px; max-height: 90vh; border-radius: 10px; border: 2px solid #f1c40f; padding: 20px; overflow-y: auto; position: relative; color: #ecf0f1; box-shadow: 0 10px 40px rgba(0,0,0,0.9);}
         .modal-close { position: absolute; top: 5px; right: 15px; font-size: 28px; color: #e74c3c; cursor: pointer; background: none; border: none; font-weight: bold; padding: 0;}
         .modal-content h2 { margin-top: 0; color: #f1c40f; border-bottom: 1px solid #34495e; padding-bottom: 8px; font-size: 16px;}
-        .modal-content p, .modal-content li { font-size: 12px; line-height: 1.4; color: #bdc3c7;}
+        .modal-content p, .modal-content li { font-size: 11px; line-height: 1.4; color: #bdc3c7;}
+        .key-icon { background-color: #444; color: #fff; padding: 2px 4px; border-radius: 3px; border: 1px solid #111; font-family: monospace; font-size: 9px;}
     </style>
 </head>
 <body>
 
-  <div id="app-root">
     <div class="simulator-wrapper">
         <h1 class="main-title">TASER 7</h1>
         
-        <div id="ar-hit-alert"></div>
-
         <div class="viewport" id="viewport">
             <div id="three-canvas"></div>
             <video id="camera-feed" class="camera-feed" autoplay playsinline></video>
-
+            
             <div class="fixed-aim-layer">
                 <div class="crosshair"></div>
                 <div id="flashlight" class="flashlight-beam"></div>
@@ -267,9 +210,8 @@
                 </div>
             </div>
 
-            <div class="sim-controls" id="sim-controls">
-                
-                <div id="combat-controls">
+            <div class="sim-controls">
+                <div id="standard-controls">
                     <div class="status-grid">
                         <div id="stat-cassette" class="status-box">⏏️ Kassetter ur</div>
                         <div id="stat-battery" class="status-box">🔋 Batteri ur</div>
@@ -280,33 +222,30 @@
                     <button class="action-btn btn-kontaktstot" id="btn-kontaktstot" onclick="window.performKontaktstot()">⚡ KONTAKTSTÖT</button>
                     
                     <div class="btn-grid-compact">
-                        <button class="action-btn" onclick="window.tiltWeapon()">🔄 Tilt (Z/X)</button>
                         <button class="action-btn" onclick="window.toggleCassette()">⏏️ Kassett</button>
-                        <button class="action-btn btn-reset" onclick="window.resetSimulator()">♻️ Återställ</button>
-                    </div>
-                </div>
-
-                <div id="setup-controls">
-                    <div class="btn-grid-compact">
                         <button class="action-btn" onclick="window.toggleBattery()">🔋 Batteri</button>
                         <button class="action-btn btn-stealth" onclick="window.activateStealth()">🥷 Dolt</button>
+                    </div>
+                    
+                    <div class="btn-grid-compact">
+                        <button class="action-btn" onclick="window.tiltWeapon()">🔄 Tilt (Z/X)</button>
                         <button class="action-btn btn-gyro" id="btn-gyro" onclick="window.initGyro()">📱 Gyro</button>
-                        <button class="action-btn" id="btn-calibrate" onclick="window.calibrateAim()" style="display:none; background-color:#8e44ad; border-color:#732d91;">🎯 Centrera</button>
-                    </div>
-
-                    <div class="btn-grid-compact">
                         <button class="action-btn btn-camera" id="btn-camera" onclick="window.toggleCamera()">📷 Kamera (AR)</button>
-                        <button class="action-btn" id="btn-webxr" onclick="window.startXR()">🌐 WebXR</button>
-                        <button class="action-btn btn-info" onclick="window.openModal('info-modal')">ℹ️ Lathund</button>
                     </div>
-                </div>
 
-                <div id="webxr-controls">
                     <div class="btn-grid-compact">
-                        <button class="action-btn" style="background-color:#2980b9; border-color:#1f618d;" onclick="window.resetWeaponXR()">🔄 Återställ Vapen</button>
-                        <button class="action-btn" style="background-color:#f39c12; border-color:#e67e22;" onclick="window.togglePlaceMode()">📍 Flytta figur</button>
-                        <button class="action-btn" style="background-color:#e74c3c; border-color:#c0392b;" onclick="window.endXRSession()">⛔ Avsluta AR</button>
+                        <button class="action-btn" id="btn-webxr" onclick="window.startXR()">🌐 WebXR</button>
+                        <button class="action-btn" id="btn-place" onclick="window.togglePlaceMode()">📍 Flytta figur</button>
+                        <button class="action-btn" id="btn-invert" onclick="window.toggleInvertMouse()">↕️ Inv. Mus</button>
                     </div>
+
+                    <div class="btn-grid">
+                        <button class="action-btn btn-warn" onclick="window.pressDualWarning()">⚠️ Funk. Kontroll</button>
+                        <button class="action-btn btn-reset" onclick="window.resetSimulator()">♻️ Återställ</button>
+                    </div>
+
+                    <button class="action-btn btn-info" onclick="window.openModal('info-modal')" style="margin-top: 4px;">ℹ️ Lathund</button>
+                    <button class="action-btn" id="btn-toggle-3d" onclick="window.toggle3DModel()" style="display:none;">👁️ Dölj 3D</button>
                 </div>
 
                 <div id="placement-controls">
@@ -320,15 +259,18 @@
         </div>
         <div class="footer">&copy; Cullibrick 2026</div>
     </div>
-  </div> 
 
     <div id="info-modal" class="modal-overlay">
         <div class="modal-content">
             <button class="modal-close" onclick="window.closeModal('info-modal')">×</button>
-            <h2>Lathund: Taser 7 Simulator</h2>
-            <p><strong>WebXR Återställ:</strong> En ny "Återställ Vapen"-knapp laddar om kassetter och ställer upp figuren igen direkt inifrån AR-läget.</p>
-            <p><strong>WebXR Tilt:</strong> Tilten fungerar nu klockrent. Vinkla bara telefonen i sidled (som en ratt) för att byta kassett.</p>
-            <p><strong>Ragdoll-effekt:</strong> När du får en godkänd NMI faller figuren. Klicka på 'Återställ Vapen' eller dra ut/in kassetten för att resa upp honom.</p>
+            <h2>Lathund: Taser 7 AR & WebXR</h2>
+            <p><strong>Åtgärder Före Användning:</strong><br>
+            1. Tryck på Batteri (Ladda inte kassetter än).<br>
+            2. Tryck ⚠️ Funk. Kontroll för att starta displayen.<br>
+            3. Inom 5 sekunder: Osäkra vapnet (Gul skärm).<br>
+            4. Klicka "Avfyra" (eller Tryck C) för gnisttest.<br>
+            5. Säkra vapnet.</p>
+            <p><strong>AR Placering:</strong> Tryck på "🌐 WebXR" eller "📷 Kamera". Menyn byts ut mot ett placeringsläge. Titta runt på golvet tills markören visar sig, och klicka sedan på "Fastställ Position" för att låsa gubben i rummet.</p>
         </div>
     </div>
 
@@ -347,23 +289,8 @@
             const entry = document.createElement('div');
             entry.className = 'log-entry'; entry.innerHTML = `> ${msg}`;
             logBox.prepend(entry);
-            logBox.scrollTop = 0;
         }
-
-        window.showHitAlert = function(success, text) {
-            const alertEl = document.getElementById('ar-hit-alert');
-            if (success) {
-                alertEl.style.borderColor = '#2ecc71';
-                alertEl.innerHTML = `<span style="color:#2ecc71; font-size:26px;">NMI UPPNÅDD!</span><br><span style="font-size:14px; color:#fff;">${text}</span>`;
-            } else {
-                alertEl.style.borderColor = '#e74c3c';
-                alertEl.innerHTML = `<span style="color:#e74c3c; font-size:26px;">NMI MISSLYCKADES!</span><br><span style="font-size:14px; color:#fff;">${text}</span>`;
-            }
-            alertEl.classList.add('show');
-            setTimeout(() => { alertEl.classList.remove('show'); }, 4000);
-        }
-
-        window.log("Simulator v7.18 startar... <span style='color:#f1c40f;'>Sätt i batteri och ladda!</span>");
+        window.log("Simulator v7.5 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
 
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
         document.querySelector('.hud-overlay').addEventListener('beforexrselect', e => e.preventDefault());
@@ -383,10 +310,9 @@
         window.currentDistance = 3.0; window.cameraAngle = 0; window.aimX = 50; window.aimY = 50; 
         window.gyroEnabled = false; window.lastTiltTime = 0;
         
-        window.isFallen = false;
-
         let audioCtx = null; let isAudioInit = false; let soundInterval = null;
 
+        // Input
         window.addEventListener('keydown', function(event) {
             const k = event.key.toLowerCase();
             if (event.code === 'Space') { event.preventDefault(); window.pressTrigger(); } 
@@ -413,14 +339,7 @@
             window.updateAimVisuals();
         });
 
-        document.getElementById('viewport').addEventListener('wheel', (e) => {
-            if (window.gyroEnabled || window.placeMode || window.xrSession) return;
-            e.preventDefault();
-            window.currentDistance += e.deltaY * 0.005;
-            window.currentDistance = Math.max(1.0, Math.min(15.0, window.currentDistance));
-            window.updateAimVisuals();
-        }, {passive: false});
-
+        // Ljud
         window.initAudio = function() {
             if (!isAudioInit) { isAudioInit = true; try { const AudioContext = window.AudioContext || window.webkitAudioContext; if (AudioContext) { audioCtx = new AudioContext(); } } catch (e) {} }
             if (audioCtx && audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch(e) {} }
@@ -442,48 +361,11 @@
             setTimeout(() => { document.getElementById('warn-left').classList.remove('active-press'); document.getElementById('warn-right').classList.remove('active-press'); }, 200);
         }
 
-        // ----- RAGDOLL -----
-        window.fallDown = function() {
-            if(window.isFallen) return;
-            window.isFallen = true;
-            let currentX = 0;
-            const targetX = -Math.PI / 2 + 0.1; 
-            const fallInt = setInterval(() => {
-                currentX -= 0.08;
-                if(window.fallPivot) window.fallPivot.rotation.x = currentX;
-                if(currentX <= targetX) {
-                    if(window.fallPivot) window.fallPivot.rotation.x = targetX;
-                    clearInterval(fallInt);
-                }
-            }, 16);
-        }
-
-        window.getUp = function() {
-            if(!window.isFallen) return;
-            let currentX = window.fallPivot ? window.fallPivot.rotation.x : 0;
-            const riseInt = setInterval(() => {
-                currentX += 0.08;
-                if(window.fallPivot) window.fallPivot.rotation.x = currentX;
-                if(currentX >= 0) {
-                    if(window.fallPivot) window.fallPivot.rotation.x = 0;
-                    window.isFallen = false;
-                    clearInterval(riseInt);
-                }
-            }, 16);
-        }
-
         // ----- PLACERINGS LOGIK -----
         window.togglePlaceMode = function() {
-            if (!window.xrSession) {
-                window.log("📍 Placering är endast tillgängligt i WebXR (Äkta AR).");
-                return;
-            }
-            if(window.getUp) window.getUp(); 
             window.placeMode = true; window.figureLocked = false;
             
-            document.getElementById('combat-controls').style.display = 'none';
-            document.getElementById('setup-controls').style.display = 'none';
-            document.getElementById('webxr-controls').style.display = 'none';
+            document.getElementById('standard-controls').style.display = 'none';
             document.getElementById('placement-controls').style.display = 'block';
 
             if (window.taserGroup) window.taserGroup.visible = false;
@@ -491,44 +373,43 @@
 
             const hint = document.getElementById('place-hint');
             if (hint) {
-                hint.innerHTML = "Peka mot golvet och vänta på markör";
+                hint.innerHTML = window.xrSession ? "Peka mot golvet och vänta på markör" : "Klicka på golvet";
                 hint.classList.add('visible');
             }
+
             window.log("Sök efter golvet och bekräfta...");
         }
 
         window.confirmPlacement = function() {
+            if (!window.placeMarker || !window.placeMarker.visible) {
+                if(!window.xrSession) {
+                    window.log("<span style='color:#f39c12'>Använder standardavstånd.</span>");
+                } else {
+                    return;
+                }
+            }
+
             window.placeMode = false; window.figureLocked = true;
 
-            if (window.taserGroup) {
-                if (window.placeMarker && window.placeMarker.visible) {
-                    window.taserGroup.position.copy(window.placeMarker.position);
-                } else {
-                    const dir = new THREE.Vector3();
-                    window.camera.getWorldDirection(dir);
-                    dir.y = 0; dir.normalize(); dir.multiplyScalar(3.0);
-                    dir.add(window.camera.position);
-                    dir.y = window.detectedFloorLevel || 0;
-                    window.taserGroup.position.copy(dir);
-                }
+            if (window.taserGroup && window.placeMarker.visible) {
+                window.taserGroup.position.copy(window.placeMarker.position);
+                window.taserGroup.position.y += 0.9; 
                 window.taserGroup.visible = true;
+            } else if (window.taserGroup) {
+                window.taserGroup.visible = true; // Fallback
             }
             
             if (window.placeMarker) window.placeMarker.visible = false;
             const hint = document.getElementById('place-hint');
             if (hint) hint.classList.remove('visible');
 
+            document.getElementById('standard-controls').style.display = 'block';
             document.getElementById('placement-controls').style.display = 'none';
-            document.getElementById('combat-controls').style.display = 'block';
-            document.getElementById('setup-controls').style.display = ''; 
-            document.getElementById('webxr-controls').style.display = window.xrSession ? 'block' : 'none';
-            
-            window.updateDisplay(); 
 
             window.log("<span style='color:#2ecc71'><b>🔒 Figuren är fastlåst!</b> Redo för insats.</span>");
         }
 
-        // ----- KAMERA AR -----
+        // ----- KAMERA & AR -----
         window.toggleCamera = async function() {
             const cameraFeed = document.getElementById('camera-feed');
             const btnCamera = document.getElementById('btn-camera');
@@ -541,23 +422,17 @@
                     cameraFeed.srcObject = window.videoStream; cameraFeed.style.display = 'block';
                     window.useCamera = true;
                     btnCamera.innerHTML = "📷 Avbryt AR"; btnCamera.classList.add('active-cam');
-                    
-                    if (typeof window.set3DVisibility === 'function') window.set3DVisibility(false);
-                    window.show3DModel = false;
-                    window.figureLocked = true;
-                    window.log("<span style='color:#f1c40f'>Kamera AR. Sikta på en riktig person. Matematisk spridning.</span>");
-                    
+                    window.togglePlaceMode(); 
                 } catch (err) { window.log("<span style='color:red'>Kunde inte starta kamera.</span>"); }
             } else {
                 if (window.videoStream) { window.videoStream.getTracks().forEach(track => track.stop()); }
                 cameraFeed.style.display = 'none'; window.useCamera = false;
                 btnCamera.innerHTML = "📷 Kamera (AR)"; btnCamera.classList.remove('active-cam');
                 
-                if (typeof window.set3DVisibility === 'function') window.set3DVisibility(true);
-                window.show3DModel = true;
-                if(window.getUp) window.getUp();
-                if(window.taserGroup) window.taserGroup.position.set(0, -0.9, 0); 
-                window.log("Återgått till svart bakgrund. Statisk figur.");
+                if (window.placeMode) { window.confirmPlacement(); }
+                window.figureLocked = true;
+                if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); // Tillbaka till center
+                window.log("Återgått till svart bakgrund.");
             }
         }
 
@@ -569,7 +444,7 @@
             navigator.xr.isSessionSupported('immersive-ar').then((canHit) => {
                 if (!canHit) { window.log("<span style='color:red'>WebXR AR inte tillgängligt.</span>"); return Promise.reject('no-xr'); }
                 if (window.xrSession) { return window.endXRSession().then(() => Promise.reject('session-ended')); }
-                return navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test', 'local-floor'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.getElementById('app-root') } });
+                return navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test', 'local-floor'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.body } });
             }).then((session) => {
                 if (!session) return;
                 window.renderer.xr.enabled = true;
@@ -584,11 +459,7 @@
                 document.getElementById('camera-feed').style.display = 'none';
                 if (btnWebXR) { btnWebXR.textContent = '⛔ Avsluta WebXR'; btnWebXR.style.backgroundColor = '#e74c3c'; }
                 
-                if (typeof window.set3DVisibility === 'function') window.set3DVisibility(true);
-                window.show3DModel = true;
-                if(window.getUp) window.getUp();
                 window.togglePlaceMode(); 
-                
                 session.addEventListener('end', window.onXRSessionEnded);
             }).catch(err => { if (err !== 'no-xr' && err !== 'session-ended') console.error(err); });
         }
@@ -601,36 +472,12 @@
             const btnWebXR = document.getElementById('btn-webxr');
             if (btnWebXR) { btnWebXR.textContent = '🌐 WebXR'; btnWebXR.style.backgroundColor = '#34495e'; }
             
-            if (window.placeMode) { 
-                document.getElementById('combat-controls').style.display = 'block';
-                document.getElementById('setup-controls').style.display = '';
-                document.getElementById('placement-controls').style.display = 'none';
-                window.placeMode = false;
-            } 
-            document.getElementById('webxr-controls').style.display = 'none';
-            
+            if (window.placeMode) { window.confirmPlacement(); } 
             window.figureLocked = true;
-            window.updateDisplay();
-            if(window.getUp) window.getUp();
-            if(window.taserGroup) window.taserGroup.position.set(0, -0.9, 0); 
+            if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); 
             window.log("WebXR-session avslutad.");
         }
         window.endXRSession = async function() { if (window.xrSession) { await window.xrSession.end(); } }
-
-        window.resetWeaponXR = function() {
-            window.chamber1 = "loaded";
-            window.chamber2 = "loaded";
-            window.activeChamber = 1;
-            const cEl = document.getElementById('stat-cassette');
-            if(cEl) {
-                cEl.textContent = "⏏️ Kassetter i"; 
-                cEl.classList.add('ok');
-            }
-            document.querySelectorAll('.dart-spark').forEach(el => el.remove());
-            if(window.getUp) window.getUp(); 
-            window.updateDisplay();
-            window.log("Vapnet och figuren har återställts.");
-        }
 
         // ----- GYRO -----
         window.initGyro = function() {
@@ -641,34 +488,14 @@
                 }).catch(e => { window.log("Kunde inte starta sensorer."); });
             } else { enableGyro(); }
         }
-        
         function enableGyro() {
             window.addEventListener('deviceorientation', handleOrientation);
-            window.gyroEnabled = true; window.log("Gyrosikte aktiverat!");
+            window.gyroEnabled = true; window.log("Rörelsespårning aktiverad!");
             document.getElementById('btn-gyro').style.display = 'none';
-            document.getElementById('btn-calibrate').style.display = 'block';
-            window.calibrateAim();
         }
-
-        window.calibrateAim = function() {
-            window.calibAlpha = null; window.calibBeta = null; 
-            window.aimX = 50; window.aimY = 50; 
-            window.log("Siktet centrerat.");
-        }
-
         function handleOrientation(event) {
             if (!window.gyroEnabled || !event.alpha || window.placeMode || window.xrSession) return;
-            
-            let alpha = event.alpha; let beta = event.beta; let gamma = event.gamma;
-            
-            const now = Date.now();
-            if (now - window.lastTiltTime > 1000 && !window.isSafe && window.hasBattery && window.chamber1 !== "empty") {
-                if (gamma > 50 || gamma < -50) { 
-                    window.tiltWeapon(); 
-                    window.lastTiltTime = now; 
-                }
-            }
-
+            let alpha = event.alpha; let beta = event.beta;
             if (window.calibBeta === null) { window.calibAlpha = alpha; window.calibBeta = beta; }
             let deltaX = alpha - window.calibAlpha; if (deltaX > 180) deltaX -= 360; if (deltaX < -180) deltaX += 360;
             let deltaY = beta - window.calibBeta;
@@ -683,42 +510,29 @@
             let spreadCm = spreadMeters * 100;
             document.getElementById('dist-label').textContent = `${window.currentDistance.toFixed(1)} M`;
             document.getElementById('spread-label').textContent = `SPRIDNING: ${spreadCm.toFixed(1)} CM`;
-            
             let baseScale = 0.5; let scaleFactor = (3.0 / window.currentDistance) * baseScale; 
             let visualDropPx = ((window.activeChamber === 1) ? 141.7 : 40.7) * scaleFactor; 
-            
-            let maxDrop = window.innerHeight * 0.35; 
-            if(visualDropPx > maxDrop) visualDropPx = maxDrop;
-
             document.getElementById('laser-red').style.top = `calc(50% + ${visualDropPx}px)`; 
         }
 
         // ----- GUI & LOGIK -----
         window.updateProjectors = function() {
-            let active = (!window.isSafe && window.hasBattery && !window.stealthMode);
-            let redActive = active && ((window.activeChamber === 1 ? window.chamber1 : window.chamber2) === "loaded");
-            
-            document.getElementById('flashlight').style.display = active ? 'block' : 'none';
-            document.getElementById('laser-green').style.display = active ? 'block' : 'none';
-            document.getElementById('laser-red').style.display = redActive ? 'block' : 'none';
+            if (!window.isSafe && window.hasBattery && !window.stealthMode) {
+                document.getElementById('flashlight').style.display = 'block'; document.getElementById('laser-green').style.display = 'block';
+                let currentChamberState = window.activeChamber === 1 ? window.chamber1 : window.chamber2;
+                if(currentChamberState === "loaded") document.getElementById('laser-red').style.display = 'block';
+                else document.getElementById('laser-red').style.display = 'none'; 
+            } else {
+                document.getElementById('flashlight').style.display = 'none'; document.getElementById('laser-green').style.display = 'none'; document.getElementById('laser-red').style.display = 'none';
+            }
         }
-
         function renderIconsHTML() {
             const getIconClass = (state) => { if(state === "loaded") return "loaded"; if(state === "fired") return "fired"; return "empty"; };
             const line1 = window.activeChamber === 1 ? "show" : ""; const line2 = window.activeChamber === 2 ? "show" : "";
             return `<div class="display-icons"><div class="chamber-col"><div class="icon-cassette ${getIconClass(window.chamber1)}"></div><div class="active-line ${line1}"></div></div><div class="icon-battery-wrap full"><div class="batt-nub"></div><div class="batt-body"></div></div><div class="chamber-col"><div class="icon-cassette ${getIconClass(window.chamber2)}"></div><div class="active-line ${line2}"></div></div></div>`;
         }
-
         window.updateDisplay = function() {
             if (window.arcTimer) return; window.updateAimVisuals(); 
-            
-            let isLoaded = (window.chamber1 === "loaded" || window.chamber2 === "loaded");
-            if (window.hasBattery && isLoaded && !window.isSafe && !window.placeMode) {
-                document.getElementById('sim-controls').classList.add('combat-mode-active');
-            } else {
-                document.getElementById('sim-controls').classList.remove('combat-mode-active');
-            }
-
             const dEl = document.getElementById('taser-display');
             if (!window.hasBattery) { dEl.innerHTML = ""; dEl.className = "display-screen"; window.displayState = "OFF"; window.updateProjectors(); return; }
             if(window.stealthMode) { dEl.classList.add('dimmed'); } else { dEl.classList.remove('dimmed'); }
@@ -726,7 +540,6 @@
             else if (window.displayState === "FUNK_MODE") { dEl.innerHTML = renderIconsHTML(); dEl.classList.add('inverted'); } 
             else if (window.displayState === "ACTIVE") { dEl.innerHTML = renderIconsHTML(); dEl.classList.remove('inverted'); } 
             else { dEl.innerHTML = ""; dEl.classList.remove('inverted'); }
-            
             window.updateProjectors();
             if(window.chamber1 === "fired" && window.chamber2 === "fired" && !window.isSafe) { document.getElementById('btn-kontaktstot').style.display = 'block'; } else { document.getElementById('btn-kontaktstot').style.display = 'none'; }
         }
@@ -741,7 +554,6 @@
                 window.chamber1 = "empty"; window.chamber2 = "empty"; window.activeChamber = 1; 
                 cEl.textContent = "⏏️ Kassetter ur"; cEl.classList.remove('ok'); window.log("Kassetter urtagna."); 
                 document.querySelectorAll('.dart-spark').forEach(el => el.remove());
-                if(window.getUp) window.getUp();
             }
             window.updateDisplay();
         }
@@ -810,19 +622,7 @@
                 if (window.activeChamber === 1) window.chamber1 = "fired"; else window.chamber2 = "fired";
                 if(typeof window.onDartsFired === 'function') {
                     let nmiResult = window.onDartsFired(window.activeChamber);
-                    
-                    if(nmiResult.success) { 
-                        window.log(`<span style='color:#2ecc71; font-weight:bold;'>NMI UPPNÅDD!</span> ${nmiResult.reason}`); 
-                        window.showHitAlert(true, nmiResult.reason);
-                        window.runCycle("NMI påbörjad...", true); 
-                        
-                        if(window.fallDown) window.fallDown();
-
-                    } else { 
-                        window.log(`<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES!</span> ${nmiResult.reason}`); 
-                        window.showHitAlert(false, nmiResult.reason);
-                        document.getElementById('three-canvas').classList.remove('fail-flash'); void document.getElementById('three-canvas').offsetWidth; document.getElementById('three-canvas').classList.add('fail-flash'); window.updateDisplay(); 
-                    }
+                    if(nmiResult.success) { window.log(`<span style='color:#2ecc71; font-weight:bold;'>NMI UPPNÅDD!</span> ${nmiResult.reason}`); window.runCycle("NMI påbörjad...", true); } else { window.log(`<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES!</span> ${nmiResult.reason}`); document.getElementById('three-canvas').classList.remove('fail-flash'); void document.getElementById('three-canvas').offsetWidth; document.getElementById('three-canvas').classList.add('fail-flash'); window.updateDisplay(); }
                 }
                 let nextChamber = window.activeChamber === 1 ? 2 : 1;
                 if ((nextChamber === 1 ? window.chamber1 : window.chamber2) === "loaded") { window.activeChamber = nextChamber; window.log(`Växlar automatiskt till laddad kammare (${window.activeChamber}).`); }
@@ -832,8 +632,8 @@
 
         window.pressSingleWarning = function() { window.initAudio(); animateWarningButtons(); if (!window.hasBattery || window.isSafe || window.arcTimer) return; window.runCycle(window.displayState === "FUNK_MODE" ? "Testar varningsbåge..." : "Skarp varningsbåge!", false); }
         window.pressDualWarning = function() { window.initAudio(); animateWarningButtons(); if (!window.hasBattery || !window.isSafe) return; window.log("Display (BOOT) aktiv i 5s."); window.displayState = "BOOT"; window.updateDisplay(); setTimeout(() => { if (window.displayState === "BOOT" && window.isSafe) { window.displayState = "OFF"; window.updateDisplay(); } }, 5000); }
-        window.tiltWeapon = function() { window.initAudio(); if (!window.hasBattery || window.isSafe || window.chamber1 === "empty") return; window.activeChamber = window.activeChamber === 1 ? 2 : 1; window.log(`Växlar till Kammare ${window.activeChamber}.`); window.updateDisplay(); }
-        window.performKontaktstot = function() { window.initAudio(); if(window.isSafe || window.arcTimer) return; window.log("<span style='color:#e67e22; font-weight:bold;'>KONTAKTSTÖT!</span>"); window.runCycle("NMI påbörjad via Kontaktstöt...", true); if(window.fallDown) window.fallDown();}
+        window.tiltWeapon = function() { window.initAudio(); if (!window.hasBattery || window.isSafe || window.chamber1 === "empty") return; window.activeChamber = window.activeChamber === 1 ? 2 : 1; window.updateDisplay(); }
+        window.performKontaktstot = function() { window.initAudio(); if(window.isSafe || window.arcTimer) return; window.log("<span style='color:#e67e22; font-weight:bold;'>KONTAKTSTÖT!</span>"); window.runCycle("NMI påbörjad via Kontaktstöt...", true); }
         window.resetSimulator = function() { window.figureLocked = false; location.reload(); }
 
         window.updateDisplay(); // Init
@@ -860,42 +660,30 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.0); dirLight.position.set(2, 5, 5); scene.add(dirLight);
         const fillLight = new THREE.DirectionalLight(0xffffff, 0.5); fillLight.position.set(0, 0, -5); scene.add(fillLight);
 
-        let taserGroup = new THREE.Group(); 
-        taserGroup.position.set(0, -0.9, 0); // FIX: Gubben placeras direkt på golvet i Svart Läge!
-        scene.add(taserGroup); 
-        window.taserGroup = taserGroup;
-        
-        const fallPivot = new THREE.Group();
-        fallPivot.position.set(0, 0, 0);
-        taserGroup.add(fallPivot);
-        window.fallPivot = fallPivot;
-
+        let taserGroup = new THREE.Group(); scene.add(taserGroup); window.taserGroup = taserGroup;
         const loader = new GLTFLoader();
-        window.set3DVisibility = function(isVisible) { taserGroup.visible = isVisible; };
-
-        loader.load('./ue_mannequin_retopology.glb', (gltf) => {
+        
+        loader.load('ue_mannequin_retopology.glb', (gltf) => {
             let dummy = gltf.scene;
             const box = new THREE.Box3().setFromObject(dummy);
             const scale = 1.8 / (box.max.y - box.min.y); 
             dummy.scale.set(scale, scale, scale);
-            
-            dummy.position.set(0, 0, 0); 
+            dummy.position.set(0, -0.9, 0);
 
             dummy.traverse((child) => {
                 if (child.isMesh) { child.material = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 0.6, metalness: 0.2 }); child.name = "Godkand_Zon"; }
             });
-            fallPivot.add(dummy);
+            taserGroup.add(dummy);
 
             const yellowMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.8, emissive: 0xf1c40f, emissiveIntensity: 0.3 });
-            const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16), yellowMat); headMesh.position.set(0, 1.65, 0.0); headMesh.name = "Huvud/Hals"; fallPivot.add(headMesh);
-            const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.2), yellowMat); chestMesh.position.set(0, 1.35, 0.08); chestMesh.name = "Hjärttrakten"; fallPivot.add(chestMesh);
-            const groinMesh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), yellowMat); groinMesh.position.set(0, 0.85, 0.08); groinMesh.name = "Genitalier"; fallPivot.add(groinMesh);
+            const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16), yellowMat); headMesh.position.set(0, 0.75, 0.0); headMesh.name = "Huvud/Hals"; taserGroup.add(headMesh);
+            const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.2), yellowMat); chestMesh.position.set(0, 0.45, 0.08); chestMesh.name = "Hjärttrakten"; taserGroup.add(chestMesh);
+            const groinMesh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), yellowMat); groinMesh.position.set(0, -0.05, 0.08); groinMesh.name = "Genitalier"; taserGroup.add(groinMesh);
 
             window.log("<span style='color:#2ecc71'>3D-Gubbe inladdad!</span>");
-        }, undefined, (e) => { 
-            window.log("<span style='color:red'>Laddningsfel (GLB). Kolla filnamnet på GitHub.</span>"); 
-        });
+        }, undefined, (e) => { window.log("<span style='color:red'>Laddningsfel (GLB).</span>"); });
 
+        // Placeringsmarkör
         const placementGround = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ visible: false }));
         placementGround.rotation.x = -Math.PI / 2; scene.add(placementGround);
         
@@ -911,17 +699,13 @@
             if (!window.show3DModel) {
                 let spreadCm = window.currentDistance * Math.tan((chamber === 1 ? 12 : 3.5) * Math.PI / 180) * 100;
                 if (spreadCm < 20.0) return { success: false, reason: `För tät spridning (${spreadCm.toFixed(1)} cm).` };
-                return { success: true, reason: `Spridning OK (${spreadCm.toFixed(1)} cm). (Träffzon antas godkänd)` };
+                return { success: true, reason: `Spridning OK (${spreadCm.toFixed(1)} cm)` };
             }
 
             const raycaster = new THREE.Raycaster();
             const rect = canvasContainer.getBoundingClientRect();
             let ndc1 = new THREE.Vector2(0, 0); 
             let visualDropPx = (chamber === 1) ? 141.7 : 40.7; 
-            
-            let maxDrop = window.innerHeight * 0.35; 
-            if(visualDropPx > maxDrop) visualDropPx = maxDrop;
-
             let ndcDrop = visualDropPx / (rect.height / 2);
             let ndc2 = new THREE.Vector2(0, -ndcDrop); 
 
@@ -1002,30 +786,6 @@
                     window.placeMarker.position.copy(hits[0].point);
                     window.placeMarker.position.y = 0.01;
                     window.placeMarker.visible = true;
-                }
-            }
-
-            // FIX: Robust WebXR Gyro som letar efter referens-rymden
-            if (renderer.xr.isPresenting && frame && !window.isSafe && window.hasBattery && window.chamber1 !== "empty") {
-                const referenceSpace = renderer.xr.getReferenceSpace();
-                if (referenceSpace) {
-                    const viewerPose = frame.getViewerPose(referenceSpace);
-                    if (viewerPose) {
-                        const q = viewerPose.transform.orientation;
-                        const quat = new THREE.Quaternion(q.x, q.y, q.z, q.w);
-                        const m = new THREE.Matrix4().makeRotationFromQuaternion(quat);
-                        
-                        // Kollar höger/vänster-lutning globalt i rummet
-                        const rightVector = new THREE.Vector3(1, 0, 0).transformDirection(m);
-                        
-                        if (Math.abs(rightVector.y) > 0.6) {
-                            const now = Date.now();
-                            if (now - window.lastTiltTime > 1000) {
-                                window.tiltWeapon();
-                                window.lastTiltTime = now;
-                            }
-                        }
-                    }
                 }
             }
 
