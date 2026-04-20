@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate AR & WebXR v7.5</title>
+    <title>Taser 7 - Ultimate AR & WebXR v7.19</title>
     <style>
         * { box-sizing: border-box; }
 
@@ -244,8 +244,10 @@
                         <button class="action-btn btn-reset" onclick="window.resetSimulator()">♻️ Återställ</button>
                     </div>
 
-                    <button class="action-btn btn-info" onclick="window.openModal('info-modal')" style="margin-top: 4px;">ℹ️ Lathund</button>
-                    <button class="action-btn" id="btn-toggle-3d" onclick="window.toggle3DModel()" style="display:none;">👁️ Dölj 3D</button>
+                    <div class="btn-grid-compact" style="margin-top: 4px;">
+                        <button class="action-btn" id="btn-toggle-3d" onclick="window.toggle3DModel()" style="display:none;">👁️ Dölj 3D</button>
+                        <button class="action-btn btn-info" style="grid-column: span 3;" onclick="window.openModal('info-modal')">ℹ️ Lathund</button>
+                    </div>
                 </div>
 
                 <div id="placement-controls">
@@ -290,8 +292,9 @@
             entry.className = 'log-entry'; entry.innerHTML = `> ${msg}`;
             logBox.prepend(entry);
         }
-        window.log("Simulator v7.5 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
+        window.log("Simulator v7.19 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
 
+        // FÖRHINDRA ATT KLICK PÅ UI SKICKAS TILL 3D/WEBXR MILJÖN!
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
         document.querySelector('.hud-overlay').addEventListener('beforexrselect', e => e.preventDefault());
 
@@ -593,7 +596,7 @@
             window.initAudio();
             if(!window.hasBattery || !window.isSafe) { window.log("<span style='color:red'>Säkra vapnet</span> för att växla Dolt Läge."); return; }
             window.stealthMode = !window.stealthMode;
-            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span>"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
+            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span> (Display släckta)"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
             window.updateDisplay();
         }
 
@@ -631,7 +634,9 @@
         }
 
         window.pressSingleWarning = function() { window.initAudio(); animateWarningButtons(); if (!window.hasBattery || window.isSafe || window.arcTimer) return; window.runCycle(window.displayState === "FUNK_MODE" ? "Testar varningsbåge..." : "Skarp varningsbåge!", false); }
+        
         window.pressDualWarning = function() { window.initAudio(); animateWarningButtons(); if (!window.hasBattery || !window.isSafe) return; window.log("Display (BOOT) aktiv i 5s."); window.displayState = "BOOT"; window.updateDisplay(); setTimeout(() => { if (window.displayState === "BOOT" && window.isSafe) { window.displayState = "OFF"; window.updateDisplay(); } }, 5000); }
+        
         window.tiltWeapon = function() { window.initAudio(); if (!window.hasBattery || window.isSafe || window.chamber1 === "empty") return; window.activeChamber = window.activeChamber === 1 ? 2 : 1; window.updateDisplay(); }
         window.performKontaktstot = function() { window.initAudio(); if(window.isSafe || window.arcTimer) return; window.log("<span style='color:#e67e22; font-weight:bold;'>KONTAKTSTÖT!</span>"); window.runCycle("NMI påbörjad via Kontaktstöt...", true); }
         window.resetSimulator = function() { window.figureLocked = false; location.reload(); }
