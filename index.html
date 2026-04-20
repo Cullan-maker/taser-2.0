@@ -3,21 +3,20 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate AR & WebXR v7.8</title>
+    <title>Taser 7 - Ultimate AR & WebXR v7.9</title>
     <style>
         * { box-sizing: border-box; }
 
         body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100%; 
+            margin: 0; padding: 0; width: 100%; height: 100dvh; /* 100dvh fixar scrollbuggar på mobiler */
             background-color: #050505; color: #ecf0f1; 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             overflow-x: hidden; 
         }
 
-        /* Dedikerad App-Root för att WebXR DOM Overlay ska fungera felfritt på alla mobiler */
         #app-root {
             display: flex; flex-direction: column; align-items: center;
-            width: 100%; min-height: 100vh; padding: 15px 10px; position: relative;
+            width: 100%; min-height: 100dvh; padding: 15px 10px; position: relative;
         }
 
         h1.main-title {
@@ -34,7 +33,7 @@
             background-color: #111; cursor: crosshair; touch-action: none; margin-bottom: 15px; transition: all 0.3s ease;
         }
 
-        #three-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
+        #three-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; outline: none; }
         .camera-feed { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none; }
 
         .camera-feed.flash, #three-canvas.flash { animation: strobe 0.1s infinite alternate; }
@@ -43,7 +42,7 @@
         .camera-feed.fail-flash, #three-canvas.fail-flash { animation: redStrobe 0.2s 3; }
         @keyframes redStrobe { 0% { filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2); } 100% { filter: none; } }
 
-        /* ----- SIKTET OCH LASRARNA (ÅTERSTÄLLDA TILL REALISTISK STORLEK) ----- */
+        /* ----- SIKTET (HTML-LASRAR FÖR DATOR/KAMERA) ----- */
         .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 99999; }
         .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.4); border-radius: 50%; }
         .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.6); }
@@ -51,7 +50,6 @@
         .crosshair::after { left: 50%; top: -5px; bottom: -5px; width: 1px; transform: translateX(-50%); }
 
         .flashlight-beam { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; height: 450px; background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%); display: none; }
-        
         .laser-green { position: absolute; width: 10px; height: 10px; background-color: #00ff00; border-radius: 50%; box-shadow: 0 0 15px #00ff00, 0 0 30px #00ff00; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
         .laser-red { position: absolute; width: 10px; height: 10px; background-color: #ff0000; border-radius: 50%; box-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000; left: 50%; transform: translateX(-50%); display: none; animation: blinkLaser 0.15s infinite alternate; transition: top 0.1s ease-out; }
         @keyframes blinkLaser { 0% { opacity: 0.3; transform: translateX(-50%) scale(0.8); } 100% { opacity: 1; transform: translateX(-50%) scale(1.2); } }
@@ -87,10 +85,24 @@
         .dist-label { color: #3498db; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px 8px; border-radius: 4px; border: 1px solid #333; }
         .spread-label { color: #e67e22; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.9); padding: 6px 10px; border-radius: 4px; border: 1px solid #d35400; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
-        /* ----- VAPEN OCH KONTROLLER ----- */
-        .main-container { display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; z-index: 50; transition: all 0.3s ease; }
+        /* ----- VAPEN OCH KONTROLLER (KLICK-BUGG LÖST) ----- */
+        .main-container { display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; z-index: 50; }
 
-        .taser-device { width: 300px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%); border-radius: 40px 40px 10px 10px; box-shadow: 0 15px 30px rgba(0,0,0,0.9), inset 0 5px 15px rgba(255,255,255,0.1); position: relative; padding-bottom: 15px; border: 2px solid #111; z-index: 2; margin-top: -10px; transition: all 0.3s ease; }
+        .taser-device { 
+            width: 300px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%); 
+            border-radius: 40px 40px 0 0; /* Platt botten för att fästa mot panelen */
+            border: 2px solid #111; border-bottom: none;
+            box-shadow: 0 -5px 15px rgba(0,0,0,0.5), inset 0 5px 15px rgba(255,255,255,0.1); 
+            position: relative; padding-bottom: 10px; z-index: 2; margin-bottom: 0;
+        }
+        
+        .sim-controls { 
+            width: 300px; background-color: #2c3e50; padding: 15px 10px 10px 10px; 
+            border-radius: 0 0 15px 15px; box-shadow: 0 15px 25px rgba(0,0,0,0.8); 
+            border: 2px solid #111; border-top: none; 
+            position: relative; z-index: 1; margin-top: 0;
+        }
+
         .warning-arc { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 120px; height: 25px; background: repeating-linear-gradient(90deg, transparent, transparent 5px, #a8eb12 8px, #ffffff 12px); filter: drop-shadow(0 0 10px #a8eb12) drop-shadow(0 0 20px #a8eb12); border-radius: 10px; display: none; animation: electricity 0.05s infinite alternate; z-index: 20; }
         .sights { display: flex; justify-content: center; gap: 40px; padding-top: 10px; }
         .sight-dot { width: 10px; height: 10px; background-color: #fff; border-radius: 50%; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.5); }
@@ -126,7 +138,7 @@
         .warning-btn-wrapper { position: absolute; top: 110px; width: 25px; height: 60px; }
         .warning-btn-wrapper.left { left: -12px; }
         .warning-btn-wrapper.right { right: -12px; }
-        .warning-btn { width: 100%; height: 100%; background: linear-gradient(to right, #444, #222); border: 2px solid #000; border-radius: 6px; cursor: pointer; box-shadow: 2px 0 4px rgba(0,0,0,0.5), inset -2px 0 4px rgba(255,255,255,0.2); transition: all 0.1s; touch-action: manipulation; }
+        .warning-btn { width: 100%; height: 100%; background: linear-gradient(to right, #444, #222); border: 2px solid #000; border-radius: 6px; cursor: pointer; box-shadow: 2px 0 4px rgba(0,0,0,0.5), inset -2px 0 4px rgba(255,255,255,0.2); touch-action: manipulation; }
         .warning-btn-wrapper.left .warning-btn { border-radius: 6px 0 0 6px; background: linear-gradient(to left, #444, #222); box-shadow: -2px 0 4px rgba(0,0,0,0.5), inset 2px 0 4px rgba(255,255,255,0.2); }
         .warning-btn-wrapper.right .warning-btn { border-radius: 0 6px 6px 0; }
         .warning-btn:active, .warning-btn.active-press { transform: scaleX(0.8); background: #111; box-shadow: inset 0 0 10px rgba(52, 152, 219, 0.5); }
@@ -138,24 +150,22 @@
         .safety-switch.unsafe::after { left: 42px; }
         .safety-label { text-align: center; font-weight: bold; margin-top: 6px; color: #111; font-size: 13px; }
 
-        /* ----- KOMPAKT KONTROLLPANEL ----- */
-        .sim-controls { width: 290px; background-color: #2c3e50; padding: 30px 10px 10px 10px; border-radius: 0 0 15px 15px; box-shadow: 0 15px 25px rgba(0,0,0,0.8); margin-top: -20px; border: 2px solid #1a252f; border-top: none; position: relative; z-index: 1; transition: all 0.3s ease;}
-        
-        button.action-btn { width: 100%; background-color: #34495e; color: white; border: 1px solid #1a252f; padding: 8px 4px; margin-bottom: 4px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 10px; touch-action: manipulation; transition: 0.1s; }
+        /* KNAPPAR */
+        button.action-btn { width: 100%; background-color: #34495e; color: white; border: 1px solid #1a252f; padding: 10px 4px; margin-bottom: 5px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 10px; touch-action: manipulation; transition: 0.1s; }
         button.action-btn:active { transform: scale(0.98); background-color: #3d566e; }
-        .btn-grid-compact { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 4px; }
+        .btn-grid-compact { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 5px; }
         .btn-grid-compact .action-btn { margin-bottom: 0; }
-        .btn-trigger { background-color: #c0392b !important; border-color: #922b21 !important; font-size: 14px !important; padding: 14px !important; text-transform: uppercase; box-shadow: 0 3px 0 #7b241c; margin-top: 5px !important; margin-bottom: 10px !important; }
+        .btn-trigger { background-color: #c0392b !important; border-color: #922b21 !important; font-size: 14px !important; padding: 14px !important; text-transform: uppercase; box-shadow: 0 3px 0 #7b241c; margin-top: 5px !important; margin-bottom: 12px !important; }
         .btn-trigger:active { box-shadow: 0 0 0 #7b241c; transform: translateY(3px); }
         .btn-info { background-color: #2980b9 !important; border-color: #1f618d !important; margin-bottom: 6px !important; font-size: 10px !important; padding: 6px !important;}
         
-        .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 6px; }
-        .status-box { background: #111; padding: 4px; text-align: center; border-radius: 3px; font-size: 9px; font-weight: bold; border: 1px solid #e74c3c; color: #e74c3c;}
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 8px; }
+        .status-box { background: #111; padding: 6px 4px; text-align: center; border-radius: 3px; font-size: 10px; font-weight: bold; border: 1px solid #e74c3c; color: #e74c3c;}
         .status-box.ok { border-color: #27ae60; color: #27ae60; }
         .status-box.stealth { border-color: #9b59b6; color: #9b59b6; grid-column: span 2;}
         .btn-kontaktstot { background-color: #e67e22 !important; border-color: #d35400 !important; font-size: 12px !important; padding: 10px !important; display: none; box-shadow: 0 3px 0 #ba4a00; margin-bottom: 10px !important;}
         .btn-kontaktstot:active { box-shadow: 0 0 0 #ba4a00; transform: translateY(3px); }
-        .log-box { background-color: #050505; color: #00ff00; font-family: monospace; font-size: 9px; height: 60px; overflow-y: auto; padding: 6px; border-radius: 5px; margin-top: 8px; border: 1px solid #222;}
+        .log-box { background-color: #050505; color: #00ff00; font-family: monospace; font-size: 10px; height: 65px; overflow-y: auto; padding: 8px; border-radius: 5px; margin-top: 8px; border: 1px solid #222;}
 
         /* ----- NYTT PLACERINGS-UI ----- */
         #placement-controls { display: none; text-align: center; padding-top: 10px; }
@@ -166,22 +176,23 @@
         body.webxr-mode { background: transparent; }
         body.webxr-mode #app-root { background: transparent; }
         body.webxr-mode .main-title { display: none; }
-        body.webxr-mode .viewport { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; box-shadow: none; border-radius: 0; background-color: transparent; margin: 0; z-index: 0; }
         
-        /* Semitransparent UI i WebXR så vi ser igenom knapparna */
+        /* Gömmer HTML-lasrarna helt i WebXR. 3D-lasrarna sköter siktet! */
+        body.webxr-mode .fixed-aim-layer { display: none !important; }
+        
+        body.webxr-mode .viewport { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; box-shadow: none; border-radius: 0; background-color: transparent; margin: 0; z-index: 0; }
         body.webxr-mode .main-container { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 400px; padding-bottom: env(safe-area-inset-bottom, 20px); }
         body.webxr-mode .taser-device { background: linear-gradient(to bottom, rgba(51, 51, 51, 0.7) 0%, rgba(34, 34, 34, 0.7) 40%, rgba(225, 192, 40, 0.7) 40%, rgba(241, 196, 15, 0.7) 100%); border-color: rgba(17, 17, 17, 0.5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); box-shadow: none; }
-        body.webxr-mode .sim-controls { background-color: rgba(20, 30, 40, 0.45); box-shadow: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 0 0 15px 15px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
-        
+        body.webxr-mode .sim-controls { background-color: rgba(20, 30, 40, 0.45); box-shadow: none; border: 1px solid rgba(255,255,255,0.1); border-top: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
         body.webxr-mode .footer { display: none; }
-        body.webxr-mode .log-box { display: block; background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.2); }
+        body.webxr-mode .log-box { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.2); }
 
         /* Modaler */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 15px;}
         .modal-content { background: #2c3e50; width: 100%; max-width: 500px; max-height: 90vh; border-radius: 10px; border: 2px solid #f1c40f; padding: 20px; overflow-y: auto; position: relative; color: #ecf0f1; box-shadow: 0 10px 40px rgba(0,0,0,0.9);}
         .modal-close { position: absolute; top: 5px; right: 15px; font-size: 28px; color: #e74c3c; cursor: pointer; background: none; border: none; font-weight: bold; padding: 0;}
         .modal-content h2 { margin-top: 0; color: #f1c40f; border-bottom: 1px solid #34495e; padding-bottom: 8px; font-size: 16px;}
-        .modal-content p, .modal-content li { font-size: 11px; line-height: 1.4; color: #bdc3c7;}
+        .modal-content p, .modal-content li { font-size: 12px; line-height: 1.4; color: #bdc3c7;}
     </style>
 </head>
 <body>
@@ -289,7 +300,7 @@
             <button class="modal-close" onclick="window.closeModal('info-modal')">×</button>
             <h2>Lathund: Taser 7 AR & WebXR</h2>
             <p><strong>AR Placering:</strong> Tryck på "🌐 WebXR" eller "📷 Kamera". Menyn byts ut mot ett placeringsläge. Titta runt på golvet tills markören visar sig, och klicka sedan på "Fastställ Position" för att låsa gubben i rummet.</p>
-            <p><strong>Rörelse (Dator):</strong> Scrolla med mushjulet för att gå fram/bak.</p>
+            <p><strong>Rörelse (Dator):</strong> Scrolla med mushjulet för att gå fram/bak. Använd musen för att sikta.</p>
         </div>
     </div>
 
@@ -324,8 +335,9 @@
             setTimeout(() => { alertEl.classList.remove('show'); }, 4000);
         }
 
-        window.log("Simulator v7.8 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
+        window.log("Simulator v7.9 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
 
+        // FÖRHINDRA ATT KLICK PÅ UI SKICKAS TILL 3D/WEBXR MILJÖN!
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
         document.querySelector('.hud-overlay').addEventListener('beforexrselect', e => e.preventDefault());
 
@@ -372,6 +384,7 @@
             window.updateAimVisuals();
         });
 
+        // Mus-Scroll för Zoom/Gå framåt (Dator)
         document.getElementById('viewport').addEventListener('wheel', (e) => {
             if (window.gyroEnabled || window.placeMode || window.xrSession) return;
             e.preventDefault();
@@ -432,12 +445,22 @@
 
             window.placeMode = false; window.figureLocked = true;
 
-            if (window.taserGroup && window.placeMarker.visible) {
-                window.taserGroup.position.copy(window.placeMarker.position);
+            if (window.taserGroup) {
+                if (window.placeMarker && window.placeMarker.visible) {
+                    window.taserGroup.position.copy(window.placeMarker.position);
+                } else {
+                    // Tvingar gubben rakt framför kameran om markör saknas
+                    const dir = new THREE.Vector3();
+                    window.camera.getWorldDirection(dir);
+                    dir.y = 0; 
+                    dir.normalize();
+                    dir.multiplyScalar(window.currentDistance);
+                    dir.add(window.camera.position);
+                    dir.y = window.detectedFloorLevel || 0;
+                    window.taserGroup.position.copy(dir);
+                }
                 window.taserGroup.position.y += 0.9; 
                 window.taserGroup.visible = true;
-            } else if (window.taserGroup) {
-                window.taserGroup.visible = true; 
             }
             
             if (window.placeMarker) window.placeMarker.visible = false;
@@ -561,6 +584,7 @@
             let spreadCm = spreadMeters * 100;
             document.getElementById('dist-label').textContent = `${window.currentDistance.toFixed(1)} M`;
             document.getElementById('spread-label').textContent = `SPRIDNING: ${spreadCm.toFixed(1)} CM`;
+            
             let baseScale = 0.5; let scaleFactor = (3.0 / window.currentDistance) * baseScale; 
             let visualDropPx = ((window.activeChamber === 1) ? 141.7 : 40.7) * scaleFactor; 
             document.getElementById('laser-red').style.top = `calc(50% + ${visualDropPx}px)`; 
@@ -568,15 +592,25 @@
 
         // ----- GUI & LOGIK -----
         window.updateProjectors = function() {
-            if (!window.isSafe && window.hasBattery && !window.stealthMode) {
-                document.getElementById('flashlight').style.display = 'block'; document.getElementById('laser-green').style.display = 'block';
-                let currentChamberState = window.activeChamber === 1 ? window.chamber1 : window.chamber2;
-                if(currentChamberState === "loaded") document.getElementById('laser-red').style.display = 'block';
-                else document.getElementById('laser-red').style.display = 'none'; 
-            } else {
-                document.getElementById('flashlight').style.display = 'none'; document.getElementById('laser-green').style.display = 'none'; document.getElementById('laser-red').style.display = 'none';
+            let active = (!window.isSafe && window.hasBattery && !window.stealthMode);
+            let redActive = active && ((window.activeChamber === 1 ? window.chamber1 : window.chamber2) === "loaded");
+            
+            document.getElementById('flashlight').style.display = active ? 'block' : 'none';
+            document.getElementById('laser-green').style.display = active ? 'block' : 'none';
+            document.getElementById('laser-red').style.display = redActive ? 'block' : 'none';
+
+            // Uppdatera de äkta 3D-lasrarna för WebXR
+            if (window.hud3D) {
+                window.hud3D.group.visible = window.xrSession ? true : false;
+                window.hud3D.green.visible = active;
+                window.hud3D.red.visible = redActive;
+                
+                let angle = (window.activeChamber === 1) ? 12 : 3.5;
+                let drop = Math.tan(angle * Math.PI / 180) * 0.5; // Z-avståndet till 3D-siktet är 0.5
+                window.hud3D.red.position.y = -drop;
             }
         }
+
         function renderIconsHTML() {
             const getIconClass = (state) => { if(state === "loaded") return "loaded"; if(state === "fired") return "fired"; return "empty"; };
             const line1 = window.activeChamber === 1 ? "show" : ""; const line2 = window.activeChamber === 2 ? "show" : "";
@@ -644,7 +678,7 @@
             window.initAudio();
             if(!window.hasBattery || !window.isSafe) { window.log("<span style='color:red'>Säkra vapnet</span> för att växla Dolt Läge."); return; }
             window.stealthMode = !window.stealthMode;
-            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span>"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
+            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span> (Display släckta)"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
             window.updateDisplay();
         }
 
@@ -715,6 +749,28 @@
         canvasContainer.appendChild(renderer.domElement);
         
         window.renderer = renderer; window.camera = camera; window.scene = scene;
+
+        // ----- NYTT: 3D HUD FÖR WEBXR -----
+        const hudGroup = new THREE.Group();
+        hudGroup.position.z = -0.5; // Halv meter framför kameran
+        camera.add(hudGroup);
+        scene.add(camera); // Kameran måste ligga i scenen om den har barn
+
+        const crossMat = new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.5, depthTest: false});
+        const cross3D = new THREE.Mesh(new THREE.RingGeometry(0.005, 0.006, 32), crossMat);
+        hudGroup.add(cross3D);
+
+        const greenMat3D = new THREE.MeshBasicMaterial({color: 0x00ff00, depthTest: false});
+        const green3D = new THREE.Mesh(new THREE.CircleGeometry(0.0015, 16), greenMat3D);
+        hudGroup.add(green3D);
+
+        const redMat3D = new THREE.MeshBasicMaterial({color: 0xff0000, depthTest: false});
+        const red3D = new THREE.Mesh(new THREE.CircleGeometry(0.0015, 16), redMat3D);
+        hudGroup.add(red3D);
+
+        window.hud3D = { group: hudGroup, cross: cross3D, green: green3D, red: red3D };
+        window.hud3D.group.visible = false; // Döljs initialt, tänds i WebXR
+        // ----------------------------------
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.0); dirLight.position.set(2, 5, 5); scene.add(dirLight);
