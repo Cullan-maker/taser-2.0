@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate AR & WebXR v7.7</title>
+    <title>Taser 7 - Ultimate AR & WebXR v7.8</title>
     <style>
         * { box-sizing: border-box; }
 
@@ -43,30 +43,18 @@
         .camera-feed.fail-flash, #three-canvas.fail-flash { animation: redStrobe 0.2s 3; }
         @keyframes redStrobe { 0% { filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2); } 100% { filter: none; } }
 
-        /* ----- SIKTET OCH DE ÖVERDRIVNA LASRARNA ----- */
+        /* ----- SIKTET OCH LASRARNA (ÅTERSTÄLLDA TILL REALISTISK STORLEK) ----- */
         .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 99999; }
-        .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 50px; height: 50px; border: 2px solid rgba(255,255,255,0.6); border-radius: 50%; }
-        .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.8); }
-        .crosshair::before { top: 50%; left: -8px; right: -8px; height: 2px; transform: translateY(-50%); }
-        .crosshair::after { left: 50%; top: -8px; bottom: -8px; width: 2px; transform: translateX(-50%); }
+        .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.4); border-radius: 50%; }
+        .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.6); }
+        .crosshair::before { top: 50%; left: -5px; right: -5px; height: 1px; transform: translateY(-50%); }
+        .crosshair::after { left: 50%; top: -5px; bottom: -5px; width: 1px; transform: translateX(-50%); }
 
         .flashlight-beam { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; height: 450px; background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%); display: none; }
         
-        /* Extremt överdrivna lasrar så de syns i AR */
-        .laser-green { 
-            position: absolute; width: 24px; height: 24px; background-color: #00ff00; 
-            border: 4px solid #ffffff; border-radius: 50%; 
-            box-shadow: 0 0 20px #00ff00, 0 0 40px #00ff00, inset 0 0 10px #fff; 
-            top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; 
-        }
-        .laser-red { 
-            position: absolute; width: 24px; height: 24px; background-color: #ff0000; 
-            border: 4px solid #ffffff; border-radius: 50%; 
-            box-shadow: 0 0 20px #ff0000, 0 0 40px #ff0000, inset 0 0 10px #fff; 
-            left: 50%; transform: translateX(-50%); display: none; 
-            animation: blinkLaser 0.15s infinite alternate; transition: top 0.1s ease-out; 
-        }
-        @keyframes blinkLaser { 0% { opacity: 0.5; transform: translateX(-50%) scale(0.7); } 100% { opacity: 1; transform: translateX(-50%) scale(1.3); } }
+        .laser-green { position: absolute; width: 10px; height: 10px; background-color: #00ff00; border-radius: 50%; box-shadow: 0 0 15px #00ff00, 0 0 30px #00ff00; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
+        .laser-red { position: absolute; width: 10px; height: 10px; background-color: #ff0000; border-radius: 50%; box-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000; left: 50%; transform: translateX(-50%); display: none; animation: blinkLaser 0.15s infinite alternate; transition: top 0.1s ease-out; }
+        @keyframes blinkLaser { 0% { opacity: 0.3; transform: translateX(-50%) scale(0.8); } 100% { opacity: 1; transform: translateX(-50%) scale(1.2); } }
 
         .lightning { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; background: radial-gradient(circle, rgba(168,235,18,0.2) 0%, transparent 60%); display: none; z-index: 5; }
         .lightning::before, .lightning::after { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 4px; background: #fff; box-shadow: 0 0 15px #a8eb12, 0 0 30px #a8eb12; animation: electricity 0.05s infinite alternate; }
@@ -102,7 +90,7 @@
         /* ----- VAPEN OCH KONTROLLER ----- */
         .main-container { display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; z-index: 50; transition: all 0.3s ease; }
 
-        .taser-device { width: 300px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%); border-radius: 40px 40px 10px 10px; box-shadow: 0 15px 30px rgba(0,0,0,0.9), inset 0 5px 15px rgba(255,255,255,0.1); position: relative; padding-bottom: 15px; border: 2px solid #111; z-index: 2; margin-top: -10px; }
+        .taser-device { width: 300px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%); border-radius: 40px 40px 10px 10px; box-shadow: 0 15px 30px rgba(0,0,0,0.9), inset 0 5px 15px rgba(255,255,255,0.1); position: relative; padding-bottom: 15px; border: 2px solid #111; z-index: 2; margin-top: -10px; transition: all 0.3s ease; }
         .warning-arc { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 120px; height: 25px; background: repeating-linear-gradient(90deg, transparent, transparent 5px, #a8eb12 8px, #ffffff 12px); filter: drop-shadow(0 0 10px #a8eb12) drop-shadow(0 0 20px #a8eb12); border-radius: 10px; display: none; animation: electricity 0.05s infinite alternate; z-index: 20; }
         .sights { display: flex; justify-content: center; gap: 40px; padding-top: 10px; }
         .sight-dot { width: 10px; height: 10px; background-color: #fff; border-radius: 50%; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.5); }
@@ -174,17 +162,19 @@
         .btn-confirm { width: 100%; padding: 15px; background: #27ae60 !important; color: white; font-weight: bold; font-size: 14px; border: 2px solid #2ecc71 !important; border-radius: 8px; cursor: pointer; text-transform: uppercase; box-shadow: 0 3px 0 #219653; margin-bottom: 10px;}
         .btn-confirm:active { background: #219653 !important; transform: translateY(3px); box-shadow: 0 0 0 #219653;}
 
-        /* ----- WEBXR STYLING OVERRIDES ----- */
+        /* ----- WEBXR STYLING OVERRIDES (GENOMSKINLIGT UI) ----- */
         body.webxr-mode { background: transparent; }
         body.webxr-mode #app-root { background: transparent; }
         body.webxr-mode .main-title { display: none; }
         body.webxr-mode .viewport { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; box-shadow: none; border-radius: 0; background-color: transparent; margin: 0; z-index: 0; }
-        /* Tvingar lasrarna att ligga överst i WebXR */
-        body.webxr-mode .fixed-aim-layer { z-index: 2147483647 !important; }
+        
+        /* Semitransparent UI i WebXR så vi ser igenom knapparna */
         body.webxr-mode .main-container { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 400px; padding-bottom: env(safe-area-inset-bottom, 20px); }
+        body.webxr-mode .taser-device { background: linear-gradient(to bottom, rgba(51, 51, 51, 0.7) 0%, rgba(34, 34, 34, 0.7) 40%, rgba(225, 192, 40, 0.7) 40%, rgba(241, 196, 15, 0.7) 100%); border-color: rgba(17, 17, 17, 0.5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); box-shadow: none; }
+        body.webxr-mode .sim-controls { background-color: rgba(20, 30, 40, 0.45); box-shadow: none; border: 1px solid rgba(255,255,255,0.1); border-radius: 0 0 15px 15px; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
+        
         body.webxr-mode .footer { display: none; }
-        body.webxr-mode .sim-controls { background-color: rgba(44, 62, 80, 0.95); box-shadow: none; border: none; border-radius: 15px 15px 0 0;}
-        body.webxr-mode .log-box { display: block; border-color: rgba(255,255,255,0.2); }
+        body.webxr-mode .log-box { display: block; background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.2); }
 
         /* Modaler */
         .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 15px;}
@@ -334,9 +324,8 @@
             setTimeout(() => { alertEl.classList.remove('show'); }, 4000);
         }
 
-        window.log("Simulator v7.7 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
+        window.log("Simulator v7.8 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
 
-        // FÖRHINDRA ATT KLICK PÅ UI SKICKAS TILL 3D/WEBXR MILJÖN!
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
         document.querySelector('.hud-overlay').addEventListener('beforexrselect', e => e.preventDefault());
 
@@ -383,7 +372,6 @@
             window.updateAimVisuals();
         });
 
-        // Återställd Mus-Scroll för Zoom/Gå framåt (Dator)
         document.getElementById('viewport').addEventListener('wheel', (e) => {
             if (window.gyroEnabled || window.placeMode || window.xrSession) return;
             e.preventDefault();
@@ -449,7 +437,7 @@
                 window.taserGroup.position.y += 0.9; 
                 window.taserGroup.visible = true;
             } else if (window.taserGroup) {
-                window.taserGroup.visible = true; // Fallback
+                window.taserGroup.visible = true; 
             }
             
             if (window.placeMarker) window.placeMarker.visible = false;
@@ -484,7 +472,7 @@
                 
                 if (window.placeMode) { window.confirmPlacement(); }
                 window.figureLocked = true;
-                if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); // Tillbaka till center
+                if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); 
                 window.log("Återgått till svart bakgrund.");
             }
         }
@@ -497,7 +485,6 @@
             navigator.xr.isSessionSupported('immersive-ar').then((canHit) => {
                 if (!canHit) { window.log("<span style='color:red'>WebXR AR inte tillgängligt.</span>"); return Promise.reject('no-xr'); }
                 if (window.xrSession) { return window.endXRSession().then(() => Promise.reject('session-ended')); }
-                // FIX FÖR DOM OVERLAY: Bind till #app-root
                 return navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test', 'local-floor'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.getElementById('app-root') } });
             }).then((session) => {
                 if (!session) return;
@@ -533,7 +520,7 @@
         }
         window.endXRSession = async function() { if (window.xrSession) { await window.xrSession.end(); } }
 
-        // ----- GYRO (UPPDATERAD FÖR ATT TILLÅTA WEBXR TILT) -----
+        // ----- GYRO -----
         window.initGyro = function() {
             window.initAudio(); 
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -548,11 +535,10 @@
             document.getElementById('btn-gyro').style.display = 'none';
         }
         function handleOrientation(event) {
-            if (!window.gyroEnabled || !event.alpha || window.placeMode) return;
+            if (!window.gyroEnabled || !event.alpha || window.placeMode || window.xrSession) return;
             
             let alpha = event.alpha; let beta = event.beta; let gamma = event.gamma;
             
-            // Tilt via Gyro API (Fungerar om inte mobilen pausar det)
             const now = Date.now();
             if (now - window.lastTiltTime > 1000 && !window.isSafe && window.hasBattery && window.chamber1 !== "empty") {
                 if (gamma > 50 || gamma < -50) { 
@@ -560,9 +546,6 @@
                     window.lastTiltTime = now; 
                 }
             }
-
-            // Hoppa över att flytta kameran manuellt om vi är i WebXR
-            if (window.xrSession) return;
 
             if (window.calibBeta === null) { window.calibAlpha = alpha; window.calibBeta = beta; }
             let deltaX = alpha - window.calibAlpha; if (deltaX > 180) deltaX -= 360; if (deltaX < -180) deltaX += 360;
@@ -661,7 +644,7 @@
             window.initAudio();
             if(!window.hasBattery || !window.isSafe) { window.log("<span style='color:red'>Säkra vapnet</span> för att växla Dolt Läge."); return; }
             window.stealthMode = !window.stealthMode;
-            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span> (Display släckta)"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
+            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span>"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
             window.updateDisplay();
         }
 
@@ -819,7 +802,6 @@
             } else { return { success: false, reason: "En eller båda pilarna missade kroppen." }; }
         };
 
-        // Klick på WebXR canvas = Flytta markören dit man klickar i rummet
         renderer.domElement.addEventListener('pointerdown', (event) => {
             if (window.placeMode && window.xrSession && event.target === renderer.domElement) {
                 const rect = canvasContainer.getBoundingClientRect();
@@ -869,19 +851,16 @@
                 }
             }
 
-            // NYTT FÖR V7.7: Känna av tilt i WebXR-läget natively!
             if (renderer.xr.isPresenting && frame && !window.isSafe && window.hasBattery && window.chamber1 !== "empty" && window.xrRefSpace) {
                 const viewerPose = frame.getViewerPose(window.xrRefSpace);
                 if (viewerPose) {
                     const q = viewerPose.transform.orientation;
-                    // Skapa Quaternion och hämta Euler vinklar (ZXY ordning är bra för mobil roll)
                     const quat = new THREE.Quaternion(q.x, q.y, q.z, q.w);
                     const euler = new THREE.Euler().setFromQuaternion(quat, 'ZXY');
                     const rollDeg = euler.z * (180 / Math.PI);
                     
                     const now = Date.now();
                     if (now - window.lastTiltTime > 1000) {
-                        // Om man lutar telefonen mer än 45 grader
                         if (rollDeg > 45 || rollDeg < -45) {
                             window.tiltWeapon();
                             window.lastTiltTime = now;
