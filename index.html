@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>Taser 7 - Ultimate AR & WebXR v7.4</title>
+    <style>
+        * { box-sizing: border-box; }
+
+        body { 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
+            background-color: #050505; color: #ecf0f1; 
+            display: flex; flex-direction: column; align-items: center;
+            padding: 15px 10px; margin: 0; min-height: 100vh; overflow-x: hidden; 
+        }
+
+        h1.main-title {
+            color: #f1c40f; margin: 0 0 10px 0; font-size: 18px; letter-spacing: 3px;
+            text-align: center; text-transform: uppercase; text-shadow: 0 2px 5px rgba(0,0,0,0.9);
+        }
+
+        /* ----- VY FRAMÅT (MÅLBILDEN) ----- */
+        .viewport {
+            width: 100%; height: 320px; border: 3px solid #333; border-radius: 10px;
+            position: relative; overflow: hidden; box-shadow: 0 10px 30px rgba(0,0,0,0.8);
+            background-color: #111; cursor: crosshair; touch-action: none; margin-bottom: 15px; transition: all 0.3s ease;
+        }
+
+        #three-canvas { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 5; }
+        .camera-feed { position: absolute; top: 0; left: 0; width: 100%; height: 100%; object-fit: cover; z-index: 1; display: none; }
+
+        .camera-feed.flash, #three-canvas.flash { animation: strobe 0.1s infinite alternate; }
+        @keyframes strobe { 0% { filter: brightness(2.5); } 100% { filter: brightness(0.5); } }
+
+        .camera-feed.fail-flash, #three-canvas.fail-flash { animation: redStrobe 0.2s 3; }
+        @keyframes redStrobe { 0% { filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2); } 100% { filter: none; } }
+
+        /* ----- SIKTET (FASTLÅST I MITTEN) ----- */
+        .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 10; }
+        .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; }
+        .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.5); }
+        .crosshair::before { top: 50%; left: -5px; right: -5px; height: 1px; transform: translateY(-50%); }
+        .crosshair::after { left: 50%; top: -5px; bottom: -5px; width: 1px; transform: translateX(-50%); }
+
+        .flashlight-beam { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 450px; height: 450px; background: radial-gradient(circle, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0.05) 40%, transparent 70%); display: none; }
+        .laser-green { position: absolute; width: 10px; height: 10px; background-color: #00ff00; border-radius: 50%; box-shadow: 0 0 15px #00ff00, 0 0 30px #00ff00; top: 50%; left: 50%; transform: translate(-50%, -50%); display: none; }
+        .laser-red { position: absolute; width: 10px; height: 10px; background-color: #ff0000; border-radius: 50%; box-shadow: 0 0 15px #ff0000, 0 0 30px #ff0000; left: 50%; transform: translateX(-50%); display: none; animation: blinkLaser 0.15s infinite alternate; transition: top 0.1s ease-out; }
+        @keyframes blinkLaser { 0% { opacity: 0.2; transform: translateX(-50%) scale(0.8); } 100% { opacity: 1; transform: translateX(-50%) scale(1.2); } }
+
+        .lightning { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 100%; height: 100%; background: radial-gradient(circle, rgba(168,235,18,0.2) 0%, transparent 60%); display: none; z-index: 5; }
+        .lightning::before, .lightning::after { content: ''; position: absolute; top: 50%; left: 0; width: 100%; height: 4px; background: #fff; box-shadow: 0 0 15px #a8eb12, 0 0 30px #a8eb12; animation: electricity 0.05s infinite alternate; }
+        .lightning::after { transform: rotate(15deg); }
+
+        /* HUD Overlay */
+        .hud-overlay { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 20; padding: 10px; display: flex; flex-direction: column; justify-content: space-between; }
+        .hud-row { display: flex; justify-content: space-between; width: 100%; }
+        .place-hint {
+            position: absolute; left: 50%; bottom: 20px; transform: translateX(-50%);
+            background: rgba(0, 0, 0, 0.75); color: #2ecc71; border: 1px solid #2ecc71;
+            padding: 8px 12px; border-radius: 20px; font-size: 11px; font-weight: bold;
+            pointer-events: none; opacity: 0; transition: opacity 0.15s ease;
+            z-index: 30; text-align: center;
+        }
+        .place-hint.visible { opacity: 1; }
+        
+        .target-label { color: #f1c40f; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 6px; border-radius: 3px; border: 1px solid #333; }
+        .dist-label { color: #3498db; font-size: 10px; font-weight: bold; background: rgba(0,0,0,0.7); padding: 4px 6px; border-radius: 3px; border: 1px solid #333; }
+        .spread-label { color: #e67e22; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px 8px; border-radius: 3px; border: 1px solid #d35400; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
+
+        /* ----- VAPEN OCH KONTROLLER ----- */
+        .main-container { display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; z-index: 50; transition: all 0.3s ease; }
+
+        .taser-device { width: 300px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%); border-radius: 40px 40px 10px 10px; box-shadow: 0 15px 30px rgba(0,0,0,0.9), inset 0 5px 15px rgba(255,255,255,0.1); position: relative; padding-bottom: 15px; border: 2px solid #111; z-index: 2; margin-top: -10px; }
+        .warning-arc { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 120px; height: 25px; background: repeating-linear-gradient(90deg, transparent, transparent 5px, #a8eb12 8px, #ffffff 12px); filter: drop-shadow(0 0 10px #a8eb12) drop-shadow(0 0 20px #a8eb12); border-radius: 10px; display: none; animation: electricity 0.05s infinite alternate; z-index: 20; }
+        .sights { display: flex; justify-content: center; gap: 40px; padding-top: 10px; }
+        .sight-dot { width: 10px; height: 10px; background-color: #fff; border-radius: 50%; box-shadow: inset 0 -2px 4px rgba(0,0,0,0.5); }
+        
+        .display-bezel { background-color: #111; margin: 15px auto; width: 180px; height: 70px; border-radius: 10px; border: 3px solid #000; display: flex; justify-content: center; align-items: center; box-shadow: inset 0 0 15px rgba(0,0,0,0.9); }
+        .display-screen { width: 160px; height: 50px; background-color: #050505; color: #ffff00; font-family: 'Courier New', Courier, monospace; font-size: 14px; font-weight: bold; display: flex; justify-content: center; align-items: center; border-radius: 5px; transition: all 0.2s; text-align: center; }
+        .display-screen.inverted { background-color: #ffff00; color: #050505; }
+        .display-screen.dimmed { opacity: 0.3; }
+
+        .display-icons { display: flex; gap: 10px; align-items: flex-end; padding-bottom: 3px; }
+        .chamber-col { display: flex; flex-direction: column; align-items: center; gap: 3px; }
+        
+        .icon-cassette { width: 25px; height: 25px; border: 2px solid rgba(255,255,255,0.2); border-radius: 2px; }
+        .inverted .icon-cassette { border-color: rgba(0,0,0,0.2); }
+        .icon-cassette.loaded { border-color: #ffff00; }
+        .inverted .icon-cassette.loaded { border-color: #050505; }
+        .icon-cassette.fired { border-color: #ffff00; background: linear-gradient(to top right, transparent calc(50% - 2px), #ffff00 calc(50% - 1px), #ffff00 calc(50% + 1px), transparent calc(50% + 2px)), linear-gradient(to bottom right, transparent calc(50% - 2px), #ffff00 calc(50% - 1px), #ffff00 calc(50% + 1px), transparent calc(50% + 2px)); }
+        .inverted .icon-cassette.fired { border-color: #050505; background: linear-gradient(to top right, transparent calc(50% - 2px), #050505 calc(50% - 1px), #050505 calc(50% + 1px), transparent calc(50% + 2px)), linear-gradient(to bottom right, transparent calc(50% - 2px), #050505 calc(50% - 1px), #050505 calc(50% + 1px), transparent calc(50% + 2px)); }
+        
+        .icon-battery-wrap { display: flex; flex-direction: column; align-items: center; margin-bottom: 7px; }
+        .batt-nub { width: 8px; height: 4px; background-color: transparent; }
+        .batt-body { width: 14px; height: 26px; border: 2px solid rgba(255,255,255,0.2); box-sizing: border-box; border-radius: 1px; }
+        .inverted .batt-body { border-color: rgba(0,0,0,0.2); }
+        .icon-battery-wrap.full .batt-nub { background-color: #ffff00; }
+        .icon-battery-wrap.full .batt-body { background-color: #ffff00; border-color: #ffff00; }
+        .inverted .icon-battery-wrap.full .batt-nub { background-color: #050505; }
+        .inverted .icon-battery-wrap.full .batt-body { background-color: #050505; border-color: #050505; }
+        
+        .active-line { width: 30px; height: 3px; background-color: transparent; }
+        .active-line.show { background-color: #ffff00; }
+        .inverted .active-line.show { background-color: #050505; }
+
+        .warning-btn-wrapper { position: absolute; top: 110px; width: 25px; height: 60px; }
+        .warning-btn-wrapper.left { left: -12px; }
+        .warning-btn-wrapper.right { right: -12px; }
+        .warning-btn { width: 100%; height: 100%; background: linear-gradient(to right, #444, #222); border: 2px solid #000; border-radius: 6px; cursor: pointer; box-shadow: 2px 0 4px rgba(0,0,0,0.5), inset -2px 0 4px rgba(255,255,255,0.2); transition: all 0.1s; touch-action: manipulation; }
+        .warning-btn-wrapper.left .warning-btn { border-radius: 6px 0 0 6px; background: linear-gradient(to left, #444, #222); box-shadow: -2px 0 4px rgba(0,0,0,0.5), inset 2px 0 4px rgba(255,255,255,0.2); }
+        .warning-btn-wrapper.right .warning-btn { border-radius: 0 6px 6px 0; }
+        .warning-btn:active, .warning-btn.active-press { transform: scaleX(0.8); background: #111; box-shadow: inset 0 0 10px rgba(52, 152, 219, 0.5); }
+
+        .safety-container { display: flex; justify-content: center; margin-top: 15px; }
+        .safety-switch { width: 80px; height: 40px; background-color: #27ae60; border: 3px solid #111; border-radius: 20px; cursor: pointer; position: relative; transition: background-color 0.3s; box-shadow: inset 0 3px 6px rgba(0,0,0,0.6); touch-action: manipulation; }
+        .safety-switch::after { content: ''; position: absolute; top: 2px; left: 2px; width: 30px; height: 30px; background-color: #fff; border-radius: 50%; transition: left 0.3s; box-shadow: 0 2px 4px rgba(0,0,0,0.5); }
+        .safety-switch.unsafe { background-color: #e74c3c; }
+        .safety-switch.unsafe::after { left: 42px; }
+        .safety-label { text-align: center; font-weight: bold; margin-top: 6px; color: #111; font-size: 13px; }
+
+        /* ----- KOMPAKT KONTROLLPANEL ----- */
+        .sim-controls { width: 290px; background-color: #2c3e50; padding: 30px 10px 10px 10px; border-radius: 0 0 15px 15px; box-shadow: 0 15px 25px rgba(0,0,0,0.8); margin-top: -20px; border: 2px solid #1a252f; border-top: none; position: relative; z-index: 1; transition: all 0.3s ease;}
+        
+        button.action-btn { width: 100%; background-color: #34495e; color: white; border: 1px solid #1a252f; padding: 8px 4px; margin-bottom: 4px; border-radius: 4px; cursor: pointer; font-weight: bold; font-size: 10px; touch-action: manipulation; transition: 0.1s; }
+        button.action-btn:active { transform: scale(0.98); background-color: #3d566e; }
+        .btn-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 4px; }
+        .btn-grid-compact { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 4px; margin-bottom: 4px; }
+        .btn-grid .action-btn, .btn-grid-compact .action-btn { margin-bottom: 0; }
+        .btn-trigger { background-color: #c0392b !important; border-color: #922b21 !important; font-size: 14px !important; padding: 14px !important; text-transform: uppercase; box-shadow: 0 3px 0 #7b241c; margin-top: 5px !important; margin-bottom: 10px !important; }
+        .btn-trigger:active { box-shadow: 0 0 0 #7b241c; transform: translateY(3px); }
+        .btn-info { background-color: #2980b9 !important; border-color: #1f618d !important; margin-bottom: 6px !important; font-size: 10px !important; padding: 6px !important;}
+        
+        .status-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4px; margin-bottom: 6px; }
+        .status-box { background: #111; padding: 4px; text-align: center; border-radius: 3px; font-size: 9px; font-weight: bold; border: 1px solid #e74c3c; color: #e74c3c;}
+        .status-box.ok { border-color: #27ae60; color: #27ae60; }
+        .status-box.stealth { border-color: #9b59b6; color: #9b59b6; grid-column: span 2;}
+        .btn-kontaktstot { background-color: #e67e22 !important; border-color: #d35400 !important; font-size: 12px !important; padding: 10px !important; display: none; box-shadow: 0 3px 0 #ba4a00; margin-bottom: 10px !important;}
+        .btn-kontaktstot:active { box-shadow: 0 0 0 #ba4a00; transform: translateY(3px); }
+        .log-box { background-color: #050505; color: #00ff00; font-family: monospace; font-size: 9px; height: 60px; overflow-y: auto; padding: 6px; border-radius: 5px; margin-top: 8px; border: 1px solid #222;}
+
+        /* ----- NYTT PLACERINGS-UI (Ersätter skjut-knapparna tillfälligt) ----- */
+        #placement-controls { display: none; text-align: center; padding-top: 10px; }
+        .btn-confirm { width: 100%; padding: 15px; background: #27ae60 !important; color: white; font-weight: bold; font-size: 14px; border: 2px solid #2ecc71 !important; border-radius: 8px; cursor: pointer; text-transform: uppercase; box-shadow: 0 3px 0 #219653; margin-bottom: 10px;}
+        .btn-confirm:active { background: #219653 !important; transform: translateY(3px); box-shadow: 0 0 0 #219653;}
+
+        /* ----- WEBXR STYLING OVERRIDES ----- */
+        body.webxr-mode { background: transparent; }
+        body.webxr-mode .main-title { display: none; }
+        body.webxr-mode .viewport { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; box-shadow: none; border-radius: 0; background-color: transparent; margin: 0; z-index: 0; }
+        body.webxr-mode .main-container { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 400px; padding-bottom: env(safe-area-inset-bottom, 20px); }
+        body.webxr-mode .footer { display: none; }
+        body.webxr-mode .sim-controls { background-color: rgba(44, 62, 80, 0.95); box-shadow: none; border: none; border-radius: 15px 15px 0 0;}
+        body.webxr-mode .log-box { display: none; }
+
+        /* Modaler */
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 1000; justify-content: center; align-items: center; padding: 15px;}
+        .modal-content { background: #2c3e50; width: 100%; max-width: 500px; max-height: 90vh; border-radius: 10px; border: 2px solid #f1c40f; padding: 20px; overflow-y: auto; position: relative; color: #ecf0f1; box-shadow: 0 10px 40px rgba(0,0,0,0.9);}
+        .modal-close { position: absolute; top: 5px; right: 15px; font-size: 28px; color: #e74c3c; cursor: pointer; background: none; border: none; font-weight: bold; padding: 0;}
+        .modal-content h2 { margin-top: 0; color: #f1c40f; border-bottom: 1px solid #34495e; padding-bottom: 8px; font-size: 16px;}
+        .modal-content p, .modal-content li { font-size: 11px; line-height: 1.4; color: #bdc3c7;}
+        .key-icon { background-color: #444; color: #fff; padding: 2px 4px; border-radius: 3px; border: 1px solid #111; font-family: monospace; font-size: 9px;}
+    </style>
+</head>
+<body>
+
+    <div class="simulator-wrapper">
+        <h1 class="main-title">TASER 7</h1>
+        
+        <div class="viewport" id="viewport">
+            <div id="three-canvas"></div>
+            <video id="camera-feed" class="camera-feed" autoplay playsinline></video>
+            
+            <div class="fixed-aim-layer">
+                <div class="crosshair"></div>
+                <div id="flashlight" class="flashlight-beam"></div>
+                <div id="laser-green" class="laser-green"></div>
+                <div id="laser-red" class="laser-red"></div>
+                <div id="lightning" class="lightning"></div>
+            </div>
+
+            <div class="hud-overlay" id="hud-overlay">
+                <div class="hud-row">
+                    <div class="target-label" id="target-label">PERSON (3D)</div>
+                    <div class="dist-label" id="dist-label">3.0 M</div>
+                </div>
+                <div class="hud-row" style="margin-top:5px; justify-content: flex-start;">
+                    <div class="spread-label" id="spread-label">SPRIDNING: -- CM</div>
+                </div>
+                <div id="place-hint" class="place-hint">Klicka för att placera figuren</div>
+            </div>
+        </div>
+        
+        <div class="main-container" id="main-container">
+            <div class="taser-device">
+                <div id="warning-arc" class="warning-arc"></div>
+                <div class="sights">
+                    <div class="sight-dot"></div><div class="sight-dot"></div>
+                </div>
+                <div class="display-bezel">
+                    <div id="taser-display" class="display-screen"></div>
+                </div>
+                <div class="warning-btn-wrapper left"><button class="warning-btn" id="warn-left" onclick="window.pressSingleWarning()"></button></div>
+                <div class="warning-btn-wrapper right"><button class="warning-btn" id="warn-right" onclick="window.pressSingleWarning()"></button></div>
+                <div class="safety-container">
+                    <div>
+                        <div id="safety-switch" class="safety-switch" onclick="window.toggleSafety()"></div>
+                        <div id="safety-label" class="safety-label">SÄKRAD</div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="sim-controls">
+                <div id="standard-controls">
+                    <div class="status-grid">
+                        <div id="stat-cassette" class="status-box">⏏️ Kassetter ur</div>
+                        <div id="stat-battery" class="status-box">🔋 Batteri ur</div>
+                        <div id="stat-stealth" class="status-box stealth" style="display:none;">🥷 DOLT LÄGE AKTIVT</div>
+                    </div>
+
+                    <button class="action-btn btn-trigger" id="btn-trigger" onclick="window.pressTrigger()">💥 AVFYRA (KLICK / SPACE)</button>
+                    <button class="action-btn btn-kontaktstot" id="btn-kontaktstot" onclick="window.performKontaktstot()">⚡ KONTAKTSTÖT</button>
+                    
+                    <div class="btn-grid-compact">
+                        <button class="action-btn" onclick="window.toggleCassette()">⏏️ Kassett</button>
+                        <button class="action-btn" onclick="window.toggleBattery()">🔋 Batteri</button>
+                        <button class="action-btn btn-stealth" onclick="window.activateStealth()">🥷 Dolt</button>
+                    </div>
+                    
+                    <div class="btn-grid-compact">
+                        <button class="action-btn" onclick="window.tiltWeapon()">🔄 Tilt (Z/X)</button>
+                        <button class="action-btn btn-gyro" id="btn-gyro" onclick="window.initGyro()">📱 Gyro</button>
+                        <button class="action-btn btn-camera" id="btn-camera" onclick="window.toggleCamera()">📷 Kamera (AR)</button>
+                    </div>
+
+                    <div class="btn-grid-compact">
+                        <button class="action-btn" id="btn-webxr" onclick="window.startXR()">🌐 WebXR</button>
+                        <button class="action-btn" id="btn-place" onclick="window.togglePlaceMode()">📍 Flytta figur</button>
+                        <button class="action-btn" id="btn-invert" onclick="window.toggleInvertMouse()">↕️ Inv. Mus</button>
+                    </div>
+
+                    <div class="btn-grid-compact">
+                        <button class="action-btn" id="btn-toggle-3d" onclick="window.toggle3DModel()" style="display:none;">👁️ Dölj 3D</button>
+                        <button class="action-btn btn-reset" onclick="window.resetSimulator()">♻️ Återställ</button>
+                        <button class="action-btn btn-info" onclick="window.openModal('info-modal')">ℹ️ Lathund</button>
+                    </div>
+                </div>
+
+                <div id="placement-controls">
+                    <p style="color: #2ecc71; font-size: 13px; font-weight: bold; margin-bottom: 5px; margin-top: 0;">📍 AR Placeringsläge</p>
+                    <p style="color: #ecf0f1; font-size: 11px; margin-bottom: 15px;">Rikta kameran mot golvet och vänta på markören. Tryck nedan när det ser bra ut.</p>
+                    <button class="action-btn btn-confirm" onclick="window.confirmPlacement()">✅ FASTSTÄLL POSITION</button>
+                </div>
+
+                <div class="log-box" id="log"></div>
+            </div>
+        </div>
+        <div class="footer">&copy; Cullibrick 2026</div>
+    </div>
+
+    <div id="info-modal" class="modal-overlay">
+        <div class="modal-content">
+            <button class="modal-close" onclick="window.closeModal('info-modal')">×</button>
+            <h2>Lathund: Taser 7 AR & WebXR</h2>
+            <p><strong>AR Placering:</strong> Tryck på "🌐 WebXR" eller "📷 Kamera". Menyn byts ut mot ett placeringsläge. Titta runt på golvet tills markören visar sig, och klicka sedan på "Fastställ Position" för att låsa gubben i rummet.</p>
+        </div>
+    </div>
+
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+
+    <script>
+        const logBox = document.getElementById('log');
+        window.log = function(msg) {
+            const entry = document.createElement('div');
+            entry.className = 'log-entry'; entry.innerHTML = `> ${msg}`;
+            logBox.prepend(entry);
+        }
+        window.log("Simulator v7.4 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
+
+        // FÖRHINDRA ATT KLICK PÅ UI SKICKAS TILL 3D/WEBXR MILJÖN!
+        document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
+        document.querySelector('.hud-overlay').addEventListener('beforexrselect', e => e.preventDefault());
+
+        window.openModal = function(id) { document.getElementById(id).style.display = 'flex'; }
+        window.closeModal = function(id) { document.getElementById(id).style.display = 'none'; }
+        window.onclick = function(event) { if (event.target.classList.contains('modal-overlay')) { event.target.style.display = "none"; } }
+
+        window.isSafe = true; window.chamber1 = "empty"; window.chamber2 = "empty";
+        window.hasBattery = false; window.displayState = "OFF"; window.arcTimer = null;
+        window.activeChamber = 1; window.stealthMode = false;
+        
+        window.useCamera = false; window.videoStream = null; window.xrSession = null;
+        window.xrHitTestSource = null; window.xrRefSpace = null; window.show3DModel = true; 
+        
+        window.placeMode = false; window.figureLocked = true; window.invertMouseY = false; 
+        window.currentDistance = 3.0; window.cameraAngle = 0; window.aimX = 50; window.aimY = 50; 
+        window.gyroEnabled = false; window.lastTiltTime = 0;
+        
+        let audioCtx = null; let isAudioInit = false; let soundInterval = null;
+
+        // Input
+        window.addEventListener('keydown', function(event) {
+            const k = event.key.toLowerCase();
+            if (event.code === 'Space') { event.preventDefault(); window.pressTrigger(); } 
+            else if (k === 'c' || event.key === 'Shift') { event.preventDefault(); window.pressSingleWarning(); } 
+            else if (k === 'z') { window.initAudio(); if (!window.hasBattery || window.isSafe || window.chamber1 === "empty") return; if (window.activeChamber !== 1) { window.activeChamber = 1; window.updateDisplay(); } } 
+            else if (k === 'x') { window.initAudio(); if (!window.hasBattery || window.isSafe || window.chamber1 === "empty") return; if (window.activeChamber !== 2) { window.activeChamber = 2; window.updateDisplay(); } }
+        });
+
+        document.getElementById('viewport').addEventListener('mousedown', function(event) {
+            if (window.placeMode) return; 
+            if (event.button === 0) { event.preventDefault(); window.pressTrigger(); }
+        });
+
+        document.getElementById('viewport').addEventListener('mousemove', (e) => {
+            if(window.gyroEnabled || window.placeMode || window.xrSession) return; 
+            if (e.target !== window.renderer?.domElement && !e.target.classList.contains('crosshair') && 
+                e.target.id !== 'flashlight' && e.target.id !== 'laser-green' && e.target.id !== 'laser-red' && 
+                e.target.id !== 'lightning') return;
+            let rect = document.getElementById('viewport').getBoundingClientRect();
+            window.aimX = ((e.clientX - rect.left) / rect.width) * 100;
+            let yPct = ((e.clientY - rect.top) / rect.height) * 100;
+            window.aimY = window.invertMouseY ? 100 - yPct : yPct;
+            window.aimX = Math.max(0, Math.min(100, window.aimX)); window.aimY = Math.max(0, Math.min(100, window.aimY));
+            window.updateAimVisuals();
+        });
+
+        // Ljud
+        window.initAudio = function() {
+            if (!isAudioInit) { isAudioInit = true; try { const AudioContext = window.AudioContext || window.webkitAudioContext; if (AudioContext) { audioCtx = new AudioContext(); } } catch (e) {} }
+            if (audioCtx && audioCtx.state === 'suspended') { try { audioCtx.resume(); } catch(e) {} }
+        }
+        function playPopSound() {
+            window.initAudio(); if (!audioCtx) return;
+            try { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = 'square'; osc.frequency.setValueAtTime(300, audioCtx.currentTime); osc.frequency.exponentialRampToValueAtTime(40, audioCtx.currentTime + 0.1); gain.gain.setValueAtTime(1, audioCtx.currentTime); gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.15); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); osc.stop(audioCtx.currentTime + 0.15); } catch(e) {}
+        }
+        function playElectricSound() {
+            window.initAudio(); if (!audioCtx) return null;
+            try { const osc = audioCtx.createOscillator(); const gain = audioCtx.createGain(); osc.type = 'sawtooth'; osc.frequency.setValueAtTime(50, audioCtx.currentTime); osc.connect(gain); gain.connect(audioCtx.destination); osc.start(); soundInterval = setInterval(() => { if(gain.gain) { gain.gain.value = Math.random() * 0.5 + 0.5; osc.frequency.value = 50 + Math.random() * 50; } }, 30); return { osc, gain }; } catch(e) { return null; }
+        }
+        function stopElectricSound(soundObj) {
+            if (soundInterval) { clearInterval(soundInterval); soundInterval = null; }
+            if (soundObj && soundObj.osc && audioCtx) { try { soundObj.gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1); soundObj.osc.stop(audioCtx.currentTime + 0.1); } catch(e) {} }
+        }
+        function animateWarningButtons() {
+            document.getElementById('warn-left').classList.add('active-press'); document.getElementById('warn-right').classList.add('active-press');
+            setTimeout(() => { document.getElementById('warn-left').classList.remove('active-press'); document.getElementById('warn-right').classList.remove('active-press'); }, 200);
+        }
+
+        // ----- PLACERINGS LOGIK -----
+        window.togglePlaceMode = function() {
+            window.placeMode = true; window.figureLocked = false;
+            
+            document.getElementById('standard-controls').style.display = 'none';
+            document.getElementById('placement-controls').style.display = 'block';
+
+            if (window.taserGroup) window.taserGroup.visible = false;
+            if (window.placeMarker) window.placeMarker.visible = true;
+
+            const hint = document.getElementById('place-hint');
+            if (hint) {
+                hint.innerHTML = window.xrSession ? "Peka mot golvet och vänta på markör" : "Klicka på golvet";
+                hint.classList.add('visible');
+            }
+
+            window.log("Sök efter golvet och bekräfta...");
+        }
+
+        window.confirmPlacement = function() {
+            if (!window.placeMarker || !window.placeMarker.visible) {
+                if(!window.xrSession) {
+                    window.log("<span style='color:#f39c12'>Använder standardavstånd.</span>");
+                } else {
+                    return;
+                }
+            }
+
+            window.placeMode = false; window.figureLocked = true;
+
+            if (window.taserGroup && window.placeMarker.visible) {
+                window.taserGroup.position.copy(window.placeMarker.position);
+                window.taserGroup.position.y += 0.9; 
+                window.taserGroup.visible = true;
+            } else if (window.taserGroup) {
+                window.taserGroup.visible = true; // Fallback
+            }
+            
+            if (window.placeMarker) window.placeMarker.visible = false;
+            const hint = document.getElementById('place-hint');
+            if (hint) hint.classList.remove('visible');
+
+            document.getElementById('standard-controls').style.display = 'block';
+            document.getElementById('placement-controls').style.display = 'none';
+
+            window.log("<span style='color:#2ecc71'><b>🔒 Figuren är fastlåst!</b> Redo för insats.</span>");
+        }
+
+        // ----- KAMERA & AR -----
+        window.toggleCamera = async function() {
+            const cameraFeed = document.getElementById('camera-feed');
+            const btnCamera = document.getElementById('btn-camera');
+
+            if (window.xrSession) { await window.endXRSession(); }
+
+            if (!window.useCamera) {
+                try {
+                    window.videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
+                    cameraFeed.srcObject = window.videoStream; cameraFeed.style.display = 'block';
+                    window.useCamera = true;
+                    btnCamera.innerHTML = "📷 Avbryt AR"; btnCamera.classList.add('active-cam');
+                    window.togglePlaceMode(); 
+                } catch (err) { window.log("<span style='color:red'>Kunde inte starta kamera.</span>"); }
+            } else {
+                if (window.videoStream) { window.videoStream.getTracks().forEach(track => track.stop()); }
+                cameraFeed.style.display = 'none'; window.useCamera = false;
+                btnCamera.innerHTML = "📷 Kamera (AR)"; btnCamera.classList.remove('active-cam');
+                
+                if (window.placeMode) { window.confirmPlacement(); }
+                window.figureLocked = true;
+                if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); // Tillbaka till center
+                window.log("Återgått till svart bakgrund.");
+            }
+        }
+
+        // ----- WEBXR -----
+        window.startXR = function() {
+            if (!navigator.xr) { window.log("<span style='color:red'>WebXR stöds inte.</span>"); return; }
+            
+            const btnWebXR = document.getElementById('btn-webxr');
+            navigator.xr.isSessionSupported('immersive-ar').then((canHit) => {
+                if (!canHit) { window.log("<span style='color:red'>WebXR AR inte tillgängligt.</span>"); return Promise.reject('no-xr'); }
+                if (window.xrSession) { return window.endXRSession().then(() => Promise.reject('session-ended')); }
+                return navigator.xr.requestSession('immersive-ar', { requiredFeatures: ['hit-test', 'local-floor'], optionalFeatures: ['dom-overlay'], domOverlay: { root: document.body } });
+            }).then((session) => {
+                if (!session) return;
+                window.renderer.xr.enabled = true;
+                window.renderer.xr.setReferenceSpaceType('local-floor');
+                return window.renderer.xr.setSession(session).then(() => session);
+            }).then((session) => {
+                if (!session) return;
+                window.xrSession = session; window.hitTestSourceRequested = false;
+                
+                document.body.classList.add('webxr-mode');
+                window.useCamera = false;
+                document.getElementById('camera-feed').style.display = 'none';
+                if (btnWebXR) { btnWebXR.textContent = '⛔ Avsluta WebXR'; btnWebXR.style.backgroundColor = '#e74c3c'; }
+                
+                window.togglePlaceMode(); 
+                session.addEventListener('end', window.onXRSessionEnded);
+            }).catch(err => { if (err !== 'no-xr' && err !== 'session-ended') console.error(err); });
+        }
+
+        window.onXRSessionEnded = function() {
+            window.xrSession = null; window.hitTestSourceRequested = false; window.xrHitTestSource = null; window.xrRefSpace = null;
+            if(window.renderer) { window.renderer.xr.setSession(null); window.renderer.xr.enabled = false; }
+            
+            document.body.classList.remove('webxr-mode');
+            const btnWebXR = document.getElementById('btn-webxr');
+            if (btnWebXR) { btnWebXR.textContent = '🌐 WebXR'; btnWebXR.style.backgroundColor = '#34495e'; }
+            
+            if (window.placeMode) { window.confirmPlacement(); } 
+            window.figureLocked = true;
+            if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); 
+            window.log("WebXR-session avslutad.");
+        }
+        window.endXRSession = async function() { if (window.xrSession) { await window.xrSession.end(); } }
+
+        // ----- GYRO -----
+        window.initGyro = function() {
+            window.initAudio(); 
+            if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+                DeviceOrientationEvent.requestPermission().then(state => {
+                    if (state === 'granted') { enableGyro(); } else { window.log("Åtkomst nekades."); }
+                }).catch(e => { window.log("Kunde inte starta sensorer."); });
+            } else { enableGyro(); }
+        }
+        function enableGyro() {
+            window.addEventListener('deviceorientation', handleOrientation);
+            window.gyroEnabled = true; window.log("Rörelsespårning aktiverad!");
+            document.getElementById('btn-gyro').style.display = 'none';
+        }
+        function handleOrientation(event) {
+            if (!window.gyroEnabled || !event.alpha || window.placeMode || window.xrSession) return;
+            let alpha = event.alpha; let beta = event.beta;
+            if (window.calibBeta === null) { window.calibAlpha = alpha; window.calibBeta = beta; }
+            let deltaX = alpha - window.calibAlpha; if (deltaX > 180) deltaX -= 360; if (deltaX < -180) deltaX += 360;
+            let deltaY = beta - window.calibBeta;
+            window.aimX = 50 + (deltaX * -0.8); window.aimY = 50 + (deltaY * -1.2); 
+            window.aimX = Math.max(0, Math.min(100, window.aimX)); window.aimY = Math.max(0, Math.min(100, window.aimY));
+            window.updateAimVisuals();
+        }
+
+        window.updateAimVisuals = function() {
+            let angle = (window.activeChamber === 1) ? 12 : 3.5;
+            let spreadMeters = window.currentDistance * Math.tan(angle * Math.PI / 180);
+            let spreadCm = spreadMeters * 100;
+            document.getElementById('dist-label').textContent = `${window.currentDistance.toFixed(1)} M`;
+            document.getElementById('spread-label').textContent = `SPRIDNING: ${spreadCm.toFixed(1)} CM`;
+            let baseScale = 0.5; let scaleFactor = (3.0 / window.currentDistance) * baseScale; 
+            let visualDropPx = ((window.activeChamber === 1) ? 141.7 : 40.7) * scaleFactor; 
+            document.getElementById('laser-red').style.top = `calc(50% + ${visualDropPx}px)`; 
+        }
+
+        // ----- GUI & LOGIK -----
+        window.updateProjectors = function() {
+            if (!window.isSafe && window.hasBattery && !window.stealthMode) {
+                document.getElementById('flashlight').style.display = 'block'; document.getElementById('laser-green').style.display = 'block';
+                let currentChamberState = window.activeChamber === 1 ? window.chamber1 : window.chamber2;
+                if(currentChamberState === "loaded") document.getElementById('laser-red').style.display = 'block';
+                else document.getElementById('laser-red').style.display = 'none'; 
+            } else {
+                document.getElementById('flashlight').style.display = 'none'; document.getElementById('laser-green').style.display = 'none'; document.getElementById('laser-red').style.display = 'none';
+            }
+        }
+        function renderIconsHTML() {
+            const getIconClass = (state) => { if(state === "loaded") return "loaded"; if(state === "fired") return "fired"; return "empty"; };
+            const line1 = window.activeChamber === 1 ? "show" : ""; const line2 = window.activeChamber === 2 ? "show" : "";
+            return `<div class="display-icons"><div class="chamber-col"><div class="icon-cassette ${getIconClass(window.chamber1)}"></div><div class="active-line ${line1}"></div></div><div class="icon-battery-wrap full"><div class="batt-nub"></div><div class="batt-body"></div></div><div class="chamber-col"><div class="icon-cassette ${getIconClass(window.chamber2)}"></div><div class="active-line ${line2}"></div></div></div>`;
+        }
+        window.updateDisplay = function() {
+            if (window.arcTimer) return; window.updateAimVisuals(); 
+            const dEl = document.getElementById('taser-display');
+            if (!window.hasBattery) { dEl.innerHTML = ""; dEl.className = "display-screen"; window.displayState = "OFF"; window.updateProjectors(); return; }
+            if(window.stealthMode) { dEl.classList.add('dimmed'); } else { dEl.classList.remove('dimmed'); }
+            if (window.displayState === "BOOT") { dEl.innerHTML = "v1.4.10<br>[||||] 94%"; dEl.classList.remove('inverted'); } 
+            else if (window.displayState === "FUNK_MODE") { dEl.innerHTML = renderIconsHTML(); dEl.classList.add('inverted'); } 
+            else if (window.displayState === "ACTIVE") { dEl.innerHTML = renderIconsHTML(); dEl.classList.remove('inverted'); } 
+            else { dEl.innerHTML = ""; dEl.classList.remove('inverted'); }
+            window.updateProjectors();
+            if(window.chamber1 === "fired" && window.chamber2 === "fired" && !window.isSafe) { document.getElementById('btn-kontaktstot').style.display = 'block'; } else { document.getElementById('btn-kontaktstot').style.display = 'none'; }
+        }
+
+        window.toggleCassette = function() {
+            window.initAudio(); if (!window.isSafe) { window.log("<span style='color:red'>FEL: Säkra vapnet!</span>"); return; }
+            const cEl = document.getElementById('stat-cassette');
+            if (window.chamber1 === "empty" && window.chamber2 === "empty") {
+                window.chamber1 = "loaded"; window.chamber2 = "loaded"; 
+                cEl.textContent = "⏏️ Kassetter i"; cEl.classList.add('ok'); window.log("Kassetter laddade.");
+            } else {
+                window.chamber1 = "empty"; window.chamber2 = "empty"; window.activeChamber = 1; 
+                cEl.textContent = "⏏️ Kassetter ur"; cEl.classList.remove('ok'); window.log("Kassetter urtagna."); 
+                document.querySelectorAll('.dart-spark').forEach(el => el.remove());
+            }
+            window.updateDisplay();
+        }
+        window.toggleBattery = function() {
+            window.initAudio(); if (!window.isSafe) { window.log("<span style='color:red'>FEL: Säkra vapnet!</span>"); return; }
+            window.hasBattery = !window.hasBattery; 
+            const bEl = document.getElementById('stat-battery');
+            bEl.textContent = window.hasBattery ? "🔋 Batteri i" : "🔋 Batteri ur"; bEl.classList.toggle('ok', window.hasBattery); 
+            window.log(window.hasBattery ? "Batteri isatt." : "Batteri urtaget.");
+            if (!window.hasBattery) { window.stealthMode = false; document.getElementById('stat-stealth').style.display = 'none'; } 
+            window.updateDisplay();
+        }
+        window.toggleSafety = function() {
+            window.initAudio(); if (window.arcTimer) return; 
+            if (!window.hasBattery) { window.log("<span style='color:red'>Vapnet saknar batteri!</span>"); return; }
+            window.isSafe = !window.isSafe;
+            const sSwitch = document.getElementById('safety-switch');
+            if (window.isSafe) {
+                sSwitch.classList.remove('unsafe'); document.getElementById('safety-label').textContent = "SÄKRAD"; window.log("Vapnet är SÄKRAT.");
+                if(window.stealthMode) { window.stealthMode = false; document.getElementById('stat-stealth').style.display = 'none'; }
+                if (window.displayState === "FUNK_MODE" || window.displayState === "ACTIVE") { window.displayState = "OFF"; } 
+                window.updateDisplay();
+            } else {
+                sSwitch.classList.add('unsafe'); document.getElementById('safety-label').textContent = "OSÄKRAD";
+                
+                if(window.chamber1 === "empty" && window.chamber2 === "empty") {
+                    window.log("Osäkrad. (Endast grönt sikte, inga kassetter)");
+                }
+
+                if(window.hasBattery) {
+                    if (window.displayState === "BOOT") { window.displayState = "FUNK_MODE"; window.log("Funktionskontroll (Infomeny) aktiv."); } else { window.displayState = "ACTIVE"; } 
+                }
+                window.updateDisplay();
+            }
+        }
+        window.activateStealth = function() {
+            window.initAudio();
+            if(!window.hasBattery || !window.isSafe) { window.log("<span style='color:red'>Säkra vapnet</span> för att växla Dolt Läge."); return; }
+            window.stealthMode = !window.stealthMode;
+            if(window.stealthMode) { document.getElementById('stat-stealth').style.display = 'block'; window.log("<span style='color:#9b59b6; font-weight:bold;'>Dolt läge PÅ!</span>"); } else { document.getElementById('stat-stealth').style.display = 'none'; window.log("Dolt läge AV."); }
+            window.updateDisplay();
+        }
+
+        window.runCycle = function(msg, isFiring) {
+            window.initAudio(); if (window.arcTimer) return; window.log(`<span style='color:#3498db'>${msg} ⚡</span>`);
+            const canvas = document.getElementById('three-canvas');
+            if(isFiring) { canvas.classList.add('flash'); document.getElementById('lightning').style.display = 'block'; } 
+            else { document.getElementById('warning-arc').style.display = 'block'; }
+            let electricSound = playElectricSound(); let count = 1; document.getElementById('taser-display').innerHTML = "5 SEK<br>CYKEL: " + count;
+            window.arcTimer = setInterval(() => {
+                count++;
+                if (count > 5) {
+                    clearInterval(window.arcTimer); window.arcTimer = null;
+                    canvas.classList.remove('flash'); document.getElementById('warning-arc').style.display = 'none'; document.getElementById('lightning').style.display = 'none';
+                    stopElectricSound(electricSound); window.log("Strömcykel avslutad."); window.updateDisplay(); 
+                } else { document.getElementById('taser-display').innerHTML = "5 SEK<br>CYKEL: " + count; }
+            }, 1000);
+        }
+
+        window.pressTrigger = function() {
+            window.initAudio(); if (!window.hasBattery || window.isSafe) { window.log("Kräver osäkrat vapen med batteri."); return; } if (window.arcTimer) return; 
+            
+            let currentState = window.activeChamber === 1 ? window.chamber1 : window.chamber2;
+            if (currentState === "loaded") {
+                playPopSound(); window.log(`<span style='color:red; font-weight:bold;'>💥 SKOTT AVFYRAT (Kammare ${window.activeChamber})</span>`);
+                if (window.activeChamber === 1) window.chamber1 = "fired"; else window.chamber2 = "fired";
+                if(typeof window.onDartsFired === 'function') {
+                    let nmiResult = window.onDartsFired(window.activeChamber);
+                    if(nmiResult.success) { window.log(`<span style='color:#2ecc71; font-weight:bold;'>NMI UPPNÅDD!</span> ${nmiResult.reason}`); window.runCycle("NMI påbörjad...", true); } else { window.log(`<span style='color:#c0392b; font-weight:bold;'>NMI MISSLYCKADES!</span> ${nmiResult.reason}`); document.getElementById('three-canvas').classList.remove('fail-flash'); void document.getElementById('three-canvas').offsetWidth; document.getElementById('three-canvas').classList.add('fail-flash'); window.updateDisplay(); }
+                }
+                let nextChamber = window.activeChamber === 1 ? 2 : 1;
+                if ((nextChamber === 1 ? window.chamber1 : window.chamber2) === "loaded") { window.activeChamber = nextChamber; window.log(`Växlar automatiskt till laddad kammare (${window.activeChamber}).`); }
+                window.updateDisplay();
+            } else if (currentState === "fired") { window.log("Återaktiverar NMI i befintliga pilar."); window.runCycle("Återaktiverar el...", true); } else { window.log("Tom kammare. (klick)"); }
+        }
+
+        window.pressSingleWarning = function() { window.initAudio(); animateWarningButtons(); if (!window.hasBattery || window.isSafe || window.arcTimer) return; window.runCycle(window.displayState === "FUNK_MODE" ? "Testar varningsbåge..." : "Skarp varningsbåge!", false); }
+        window.pressDualWarning = function() { window.initAudio(); animateWarningButtons(); if (!window.hasBattery || !window.isSafe) return; window.log("Display (BOOT) aktiv i 5s."); window.displayState = "BOOT"; window.updateDisplay(); setTimeout(() => { if (window.displayState === "BOOT" && window.isSafe) { window.displayState = "OFF"; window.updateDisplay(); } }, 5000); }
+        window.tiltWeapon = function() { window.initAudio(); if (!window.hasBattery || window.isSafe || window.chamber1 === "empty") return; window.activeChamber = window.activeChamber === 1 ? 2 : 1; window.updateDisplay(); }
+        window.performKontaktstot = function() { window.initAudio(); if(window.isSafe || window.arcTimer) return; window.log("<span style='color:#e67e22; font-weight:bold;'>KONTAKTSTÖT!</span>"); window.runCycle("NMI påbörjad via Kontaktstöt...", true); }
+        window.resetSimulator = function() { window.figureLocked = false; location.reload(); }
+
+        window.updateDisplay(); // Init
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
+
+        const canvasContainer = document.getElementById('three-canvas');
+        const scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x111111);
+
+        const camera = new THREE.PerspectiveCamera(45, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 100);
+        const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+        renderer.setClearColor(0x000000, 0); 
+        renderer.xr.enabled = true;
+        canvasContainer.appendChild(renderer.domElement);
+        
+        window.renderer = renderer; window.camera = camera; window.scene = scene;
+
+        scene.add(new THREE.AmbientLight(0xffffff, 0.6));
+        const dirLight = new THREE.DirectionalLight(0xffffff, 1.0); dirLight.position.set(2, 5, 5); scene.add(dirLight);
+        const fillLight = new THREE.DirectionalLight(0xffffff, 0.5); fillLight.position.set(0, 0, -5); scene.add(fillLight);
+
+        let taserGroup = new THREE.Group(); scene.add(taserGroup); window.taserGroup = taserGroup;
+        const loader = new GLTFLoader();
+        
+        loader.load('ue_mannequin_retopology.glb', (gltf) => {
+            let dummy = gltf.scene;
+            const box = new THREE.Box3().setFromObject(dummy);
+            const scale = 1.8 / (box.max.y - box.min.y); 
+            dummy.scale.set(scale, scale, scale);
+            dummy.position.set(0, -0.9, 0);
+
+            dummy.traverse((child) => {
+                if (child.isMesh) { child.material = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 0.6, metalness: 0.2 }); child.name = "Godkand_Zon"; }
+            });
+            taserGroup.add(dummy);
+
+            const yellowMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.8, emissive: 0xf1c40f, emissiveIntensity: 0.3 });
+            const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16), yellowMat); headMesh.position.set(0, 0.75, 0.0); headMesh.name = "Huvud/Hals"; taserGroup.add(headMesh);
+            const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.2), yellowMat); chestMesh.position.set(0, 0.45, 0.08); chestMesh.name = "Hjärttrakten"; taserGroup.add(chestMesh);
+            const groinMesh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), yellowMat); groinMesh.position.set(0, -0.05, 0.08); groinMesh.name = "Genitalier"; taserGroup.add(groinMesh);
+
+            window.log("<span style='color:#2ecc71'>3D-Gubbe inladdad!</span>");
+        }, undefined, (e) => { window.log("<span style='color:red'>Laddningsfel (GLB).</span>"); });
+
+        // Placeringsmarkör
+        const placementGround = new THREE.Mesh(new THREE.PlaneGeometry(100, 100), new THREE.MeshBasicMaterial({ visible: false }));
+        placementGround.rotation.x = -Math.PI / 2; scene.add(placementGround);
+        
+        const placementMarker = new THREE.Group();
+        placementMarker.add(new THREE.Mesh(new THREE.RingGeometry(0.25, 0.4, 48), new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.8, side: THREE.DoubleSide })));
+        placementMarker.add(new THREE.Mesh(new THREE.CircleGeometry(0.12, 32), new THREE.MeshBasicMaterial({ color: 0x00ff00, transparent: true, opacity: 0.35, side: THREE.DoubleSide })));
+        placementMarker.children[1].rotation.x = -Math.PI / 2; placementMarker.children[0].rotation.x = -Math.PI / 2;
+        placementMarker.position.y = 0.01; placementMarker.visible = false; scene.add(placementMarker); window.placeMarker = placementMarker;
+
+        const placementRaycaster = new THREE.Raycaster();
+
+        window.onDartsFired = function(chamber) {
+            if (!window.show3DModel) {
+                let spreadCm = window.currentDistance * Math.tan((chamber === 1 ? 12 : 3.5) * Math.PI / 180) * 100;
+                if (spreadCm < 20.0) return { success: false, reason: `För tät spridning (${spreadCm.toFixed(1)} cm).` };
+                return { success: true, reason: `Spridning OK (${spreadCm.toFixed(1)} cm)` };
+            }
+
+            const raycaster = new THREE.Raycaster();
+            const rect = canvasContainer.getBoundingClientRect();
+            let ndc1 = new THREE.Vector2(0, 0); 
+            let visualDropPx = (chamber === 1) ? 141.7 : 40.7; 
+            let ndcDrop = visualDropPx / (rect.height / 2);
+            let ndc2 = new THREE.Vector2(0, -ndcDrop); 
+
+            raycaster.setFromCamera(ndc1, camera);
+            raycaster.ray.direction.x += (Math.random() - 0.5) * 0.005; raycaster.ray.direction.y += (Math.random() - 0.5) * 0.005;
+            let hits1 = raycaster.intersectObject(taserGroup, true);
+
+            raycaster.setFromCamera(ndc2, camera);
+            raycaster.ray.direction.x += (Math.random() - 0.5) * 0.005; raycaster.ray.direction.y += (Math.random() - 0.5) * 0.005;
+            let hits2 = raycaster.intersectObject(taserGroup, true);
+
+            if (hits1.length > 0 && hits2.length > 0) {
+                let hit1 = hits1[0]; let hit2 = hits2[0];
+                document.querySelectorAll('.dart-spark').forEach(el => el.remove());
+                
+                const sGeo = new THREE.SphereGeometry(0.015, 8, 8); const sMat = new THREE.MeshBasicMaterial({color: 0xffffff});
+                const s1 = new THREE.Mesh(sGeo, sMat); s1.position.copy(hit1.point); scene.add(s1); setTimeout(() => scene.remove(s1), 5000);
+                const s2 = new THREE.Mesh(sGeo, sMat); s2.position.copy(hit2.point); scene.add(s2); setTimeout(() => scene.remove(s2), 5000);
+
+                let distCm = hit1.point.distanceTo(hit2.point) * 100;
+                let badZone = null;
+                if(hit1.object.name !== "Godkand_Zon") badZone = hit1.object.name;
+                if(hit2.object.name !== "Godkand_Zon") badZone = hit2.object.name;
+
+                if (badZone) return { success: false, reason: `Träff i förbjuden zon (${badZone}).` };
+                
+                let minSpreadCm = 20.0; 
+                if (window.currentDistance > 7) { minSpreadCm = 20.0 + (window.currentDistance - 7) * 2; } else if (window.currentDistance < 2) { minSpreadCm = 15.0; }
+                
+                if (distCm < minSpreadCm) return { success: false, reason: `För tät spridning (${distCm.toFixed(1)} cm).` };
+                return { success: true, reason: `Perfekt spridning (${distCm.toFixed(1)} cm) i godkänd zon!` };
+            } else { return { success: false, reason: "En eller båda pilarna missade kroppen." }; }
+        };
+
+        // Klick på WebXR canvas = Flytta markören dit man klickar i rummet
+        renderer.domElement.addEventListener('pointerdown', (event) => {
+            if (window.placeMode && window.xrSession && event.target === renderer.domElement) {
+                const rect = canvasContainer.getBoundingClientRect();
+                const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+                const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+                placementRaycaster.setFromCamera(new THREE.Vector2(x, y), camera);
+                const hits = placementRaycaster.intersectObject(placementGround, true);
+                if (hits.length > 0) {
+                    window.placeMarker.position.copy(hits[0].point);
+                    window.placeMarker.position.y += 0.01;
+                    window.placeMarker.visible = true;
+                }
+            }
+        });
+
+        renderer.setAnimationLoop((timestamp, frame) => {
+            if (window.placeMode && renderer.xr.isPresenting && frame) {
+                const session = renderer.xr.getSession();
+                const referenceSpace = renderer.xr.getReferenceSpace();
+
+                if (!window.hitTestSourceRequested) {
+                    session.requestReferenceSpace('viewer').then((viewerSpace) => {
+                        session.requestHitTestSource({ space: viewerSpace }).then((source) => { window.xrHitTestSource = source; });
+                    });
+                    window.hitTestSourceRequested = true;
+                }
+
+                if (window.xrHitTestSource) {
+                    const hitTestResults = frame.getHitTestResults(window.xrHitTestSource);
+                    if (hitTestResults.length > 0) {
+                        const hit = hitTestResults[0];
+                        const pose = hit.getPose(referenceSpace);
+                        if (pose) {
+                            window.placeMarker.visible = true;
+                            window.placeMarker.position.set(pose.transform.position.x, pose.transform.position.y + 0.01, pose.transform.position.z);
+                        }
+                    } else { window.placeMarker.visible = false; }
+                }
+            } 
+            else if (window.placeMode && !renderer.xr.isPresenting && window.useCamera) {
+                placementRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
+                const hits = placementRaycaster.intersectObject(placementGround, true);
+                if (hits.length > 0) {
+                    window.placeMarker.position.copy(hits[0].point);
+                    window.placeMarker.position.y = 0.01;
+                    window.placeMarker.visible = true;
+                }
+            }
+
+            if (renderer.xr.isPresenting && window.figureLocked && window.taserGroup.visible) {
+                window.currentDistance = camera.position.distanceTo(window.taserGroup.position);
+                window.currentDistance = Math.max(0.5, window.currentDistance); 
+                window.updateAimVisuals(); 
+            }
+
+            if (!renderer.xr.isPresenting) {
+                if(window.useCamera) { scene.background = null; } else { scene.background = new THREE.Color(0x111111); }
+
+                let camX = Math.sin(window.cameraAngle) * window.currentDistance;
+                let camZ = Math.cos(window.cameraAngle) * window.currentDistance;
+                camera.position.set(camX, 0, camZ);
+                
+                let lookTarget = new THREE.Vector3(0, 0, 0); 
+                let panX = (50 - window.aimX) * 0.01 * window.currentDistance;
+                let activeAimY = window.invertMouseY ? (100 - window.aimY) : window.aimY;
+                let panY = (activeAimY - 50) * 0.01 * window.currentDistance;
+                
+                lookTarget.y = panY;
+                lookTarget.x -= Math.cos(window.cameraAngle) * panX;
+                lookTarget.z += Math.sin(window.cameraAngle) * panX;
+
+                camera.lookAt(lookTarget);
+            }
+            
+            renderer.render(scene, camera);
+        });
+    </script>
+</body>
+</html>
