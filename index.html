@@ -3,12 +3,12 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate AR & WebXR v7.9</title>
+    <title>Taser 7 - Ultimate Simulator v7.10</title>
     <style>
         * { box-sizing: border-box; }
 
         body, html { 
-            margin: 0; padding: 0; width: 100%; height: 100dvh; /* 100dvh fixar scrollbuggar på mobiler */
+            margin: 0; padding: 0; width: 100%; height: 100dvh; 
             background-color: #050505; color: #ecf0f1; 
             font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; 
             overflow-x: hidden; 
@@ -85,22 +85,23 @@
         .dist-label { color: #3498db; font-size: 11px; font-weight: bold; background: rgba(0,0,0,0.8); padding: 5px 8px; border-radius: 4px; border: 1px solid #333; }
         .spread-label { color: #e67e22; font-size: 12px; font-weight: bold; background: rgba(0,0,0,0.9); padding: 6px 10px; border-radius: 4px; border: 1px solid #d35400; box-shadow: 0 2px 5px rgba(0,0,0,0.5); }
 
-        /* ----- VAPEN OCH KONTROLLER (KLICK-BUGG LÖST) ----- */
+        /* ----- VAPEN OCH KONTROLLER ----- */
         .main-container { display: flex; flex-direction: column; align-items: center; width: 100%; position: relative; z-index: 50; }
 
         .taser-device { 
             width: 300px; background: linear-gradient(to bottom, #333 0%, #222 40%, #e1c028 40%, #f1c40f 100%); 
-            border-radius: 40px 40px 0 0; /* Platt botten för att fästa mot panelen */
+            border-radius: 40px 40px 0 0; 
             border: 2px solid #111; border-bottom: none;
             box-shadow: 0 -5px 15px rgba(0,0,0,0.5), inset 0 5px 15px rgba(255,255,255,0.1); 
             position: relative; padding-bottom: 10px; z-index: 2; margin-bottom: 0;
+            transition: all 0.3s ease;
         }
         
         .sim-controls { 
             width: 300px; background-color: #2c3e50; padding: 15px 10px 10px 10px; 
             border-radius: 0 0 15px 15px; box-shadow: 0 15px 25px rgba(0,0,0,0.8); 
             border: 2px solid #111; border-top: none; 
-            position: relative; z-index: 1; margin-top: 0;
+            position: relative; z-index: 1; margin-top: 0; transition: all 0.3s ease;
         }
 
         .warning-arc { position: absolute; top: -15px; left: 50%; transform: translateX(-50%); width: 120px; height: 25px; background: repeating-linear-gradient(90deg, transparent, transparent 5px, #a8eb12 8px, #ffffff 12px); filter: drop-shadow(0 0 10px #a8eb12) drop-shadow(0 0 20px #a8eb12); border-radius: 10px; display: none; animation: electricity 0.05s infinite alternate; z-index: 20; }
@@ -155,6 +156,11 @@
         button.action-btn:active { transform: scale(0.98); background-color: #3d566e; }
         .btn-grid-compact { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 5px; margin-bottom: 5px; }
         .btn-grid-compact .action-btn { margin-bottom: 0; }
+        
+        /* Göm Flytta Figur som standard. Visas bara i WebXR */
+        #btn-place { display: none; }
+        body.webxr-mode #btn-place { display: block; }
+
         .btn-trigger { background-color: #c0392b !important; border-color: #922b21 !important; font-size: 14px !important; padding: 14px !important; text-transform: uppercase; box-shadow: 0 3px 0 #7b241c; margin-top: 5px !important; margin-bottom: 12px !important; }
         .btn-trigger:active { box-shadow: 0 0 0 #7b241c; transform: translateY(3px); }
         .btn-info { background-color: #2980b9 !important; border-color: #1f618d !important; margin-bottom: 6px !important; font-size: 10px !important; padding: 6px !important;}
@@ -172,7 +178,7 @@
         .btn-confirm { width: 100%; padding: 15px; background: #27ae60 !important; color: white; font-weight: bold; font-size: 14px; border: 2px solid #2ecc71 !important; border-radius: 8px; cursor: pointer; text-transform: uppercase; box-shadow: 0 3px 0 #219653; margin-bottom: 10px;}
         .btn-confirm:active { background: #219653 !important; transform: translateY(3px); box-shadow: 0 0 0 #219653;}
 
-        /* ----- WEBXR STYLING OVERRIDES (GENOMSKINLIGT UI) ----- */
+        /* ----- WEBXR STYLING OVERRIDES (GENOMSKINLIGT UI + FÖRMINDST) ----- */
         body.webxr-mode { background: transparent; }
         body.webxr-mode #app-root { background: transparent; }
         body.webxr-mode .main-title { display: none; }
@@ -182,7 +188,15 @@
         
         body.webxr-mode .viewport { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; border: none; box-shadow: none; border-radius: 0; background-color: transparent; margin: 0; z-index: 0; }
         body.webxr-mode .main-container { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 400px; padding-bottom: env(safe-area-inset-bottom, 20px); }
-        body.webxr-mode .taser-device { background: linear-gradient(to bottom, rgba(51, 51, 51, 0.7) 0%, rgba(34, 34, 34, 0.7) 40%, rgba(225, 192, 40, 0.7) 40%, rgba(241, 196, 15, 0.7) 100%); border-color: rgba(17, 17, 17, 0.5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); box-shadow: none; }
+        
+        /* Dra ner och krymp Tasern i WebXR */
+        body.webxr-mode .taser-device { 
+            transform: scale(0.8) translateY(30px); /* Gör den 20% mindre och trycker ner den */
+            margin-bottom: -10px; /* Drar upp kontrollerna tajtare */
+            background: linear-gradient(to bottom, rgba(51, 51, 51, 0.7) 0%, rgba(34, 34, 34, 0.7) 40%, rgba(225, 192, 40, 0.7) 40%, rgba(241, 196, 15, 0.7) 100%); 
+            border-color: rgba(17, 17, 17, 0.5); backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px); box-shadow: none; 
+        }
+        
         body.webxr-mode .sim-controls { background-color: rgba(20, 30, 40, 0.45); box-shadow: none; border: 1px solid rgba(255,255,255,0.1); border-top: none; backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); }
         body.webxr-mode .footer { display: none; }
         body.webxr-mode .log-box { background: rgba(0,0,0,0.5); border-color: rgba(255,255,255,0.2); }
@@ -223,7 +237,7 @@
                 <div class="hud-row" style="margin-top:5px; justify-content: flex-start;">
                     <div class="spread-label" id="spread-label">SPRIDNING: -- CM</div>
                 </div>
-                <div id="place-hint" class="place-hint">Klicka för att placera figuren</div>
+                <div id="place-hint" class="place-hint">Peka mot golvet</div>
             </div>
         </div>
         
@@ -276,7 +290,6 @@
                     </div>
 
                     <div class="btn-grid-compact">
-                        <button class="action-btn" id="btn-toggle-3d" onclick="window.toggle3DModel()" style="display:none;">👁️ Dölj 3D</button>
                         <button class="action-btn btn-reset" onclick="window.resetSimulator()">♻️ Återställ</button>
                         <button class="action-btn btn-info" onclick="window.openModal('info-modal')">ℹ️ Lathund</button>
                     </div>
@@ -299,8 +312,9 @@
         <div class="modal-content">
             <button class="modal-close" onclick="window.closeModal('info-modal')">×</button>
             <h2>Lathund: Taser 7 AR & WebXR</h2>
-            <p><strong>AR Placering:</strong> Tryck på "🌐 WebXR" eller "📷 Kamera". Menyn byts ut mot ett placeringsläge. Titta runt på golvet tills markören visar sig, och klicka sedan på "Fastställ Position" för att låsa gubben i rummet.</p>
-            <p><strong>Rörelse (Dator):</strong> Scrolla med mushjulet för att gå fram/bak. Använd musen för att sikta.</p>
+            <p><strong>AR Placering:</strong> Tryck på "🌐 WebXR". Menyn byts ut mot ett placeringsläge. Titta runt på golvet tills markören visar sig, och klicka sedan på "Fastställ Position" för att låsa gubben i rummet.</p>
+            <p><strong>Kamera AR:</strong> Visar enbart din kamera. Ingen placering krävs. Sikta på en riktig person, koden räknar ut spridningen automatiskt via avståndsmätaren!</p>
+            <p><strong>Rörelse (Dator):</strong> Scrolla med mushjulet för att ställa in avstånd.</p>
         </div>
     </div>
 
@@ -335,7 +349,7 @@
             setTimeout(() => { alertEl.classList.remove('show'); }, 4000);
         }
 
-        window.log("Simulator v7.9 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
+        window.log("Simulator v7.10 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
 
         // FÖRHINDRA ATT KLICK PÅ UI SKICKAS TILL 3D/WEBXR MILJÖN!
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
@@ -384,7 +398,7 @@
             window.updateAimVisuals();
         });
 
-        // Mus-Scroll för Zoom/Gå framåt (Dator)
+        // Mus-Scroll för Zoom/Avstånd (Dator)
         document.getElementById('viewport').addEventListener('wheel', (e) => {
             if (window.gyroEnabled || window.placeMode || window.xrSession) return;
             e.preventDefault();
@@ -415,8 +429,18 @@
             setTimeout(() => { document.getElementById('warn-left').classList.remove('active-press'); document.getElementById('warn-right').classList.remove('active-press'); }, 200);
         }
 
-        // ----- PLACERINGS LOGIK -----
+        window.toggleInvertMouse = function() {
+            window.invertMouseY = !window.invertMouseY;
+            document.getElementById('btn-invert').style.backgroundColor = window.invertMouseY ? "#2980b9" : "#34495e";
+            window.log("Inverterad Mus: " + (window.invertMouseY ? "PÅ" : "AV"));
+        }
+
+        // ----- PLACERINGS LOGIK (ENDAST WEBXR) -----
         window.togglePlaceMode = function() {
+            if (!window.xrSession) {
+                window.log("📍 Placering är endast tillgängligt i WebXR (Äkta AR).");
+                return;
+            }
             window.placeMode = true; window.figureLocked = false;
             
             document.getElementById('standard-controls').style.display = 'none';
@@ -427,34 +451,23 @@
 
             const hint = document.getElementById('place-hint');
             if (hint) {
-                hint.innerHTML = window.xrSession ? "Peka mot golvet och vänta på markör" : "Klicka på golvet (Svart/Kamera)";
+                hint.innerHTML = "Peka mot golvet och vänta på markör";
                 hint.classList.add('visible');
             }
-
             window.log("Sök efter golvet och bekräfta...");
         }
 
         window.confirmPlacement = function() {
-            if (!window.placeMarker || !window.placeMarker.visible) {
-                if(!window.xrSession) {
-                    window.log("<span style='color:#f39c12'>Använder standardavstånd.</span>");
-                } else {
-                    return;
-                }
-            }
-
             window.placeMode = false; window.figureLocked = true;
 
             if (window.taserGroup) {
                 if (window.placeMarker && window.placeMarker.visible) {
                     window.taserGroup.position.copy(window.placeMarker.position);
                 } else {
-                    // Tvingar gubben rakt framför kameran om markör saknas
+                    // Fallback om markör saknas
                     const dir = new THREE.Vector3();
                     window.camera.getWorldDirection(dir);
-                    dir.y = 0; 
-                    dir.normalize();
-                    dir.multiplyScalar(window.currentDistance);
+                    dir.y = 0; dir.normalize(); dir.multiplyScalar(3.0);
                     dir.add(window.camera.position);
                     dir.y = window.detectedFloorLevel || 0;
                     window.taserGroup.position.copy(dir);
@@ -469,11 +482,10 @@
 
             document.getElementById('standard-controls').style.display = 'block';
             document.getElementById('placement-controls').style.display = 'none';
-
             window.log("<span style='color:#2ecc71'><b>🔒 Figuren är fastlåst!</b> Redo för insats.</span>");
         }
 
-        // ----- KAMERA & AR -----
+        // ----- KAMERA AR (INGEN PLACERING) -----
         window.toggleCamera = async function() {
             const cameraFeed = document.getElementById('camera-feed');
             const btnCamera = document.getElementById('btn-camera');
@@ -486,17 +498,24 @@
                     cameraFeed.srcObject = window.videoStream; cameraFeed.style.display = 'block';
                     window.useCamera = true;
                     btnCamera.innerHTML = "📷 Avbryt AR"; btnCamera.classList.add('active-cam');
-                    window.togglePlaceMode(); 
+                    
+                    // Kamera-läge = Ingen figur, ingen placering!
+                    if (typeof window.set3DVisibility === 'function') window.set3DVisibility(false);
+                    window.show3DModel = false;
+                    window.figureLocked = true;
+                    window.log("<span style='color:#f1c40f'>Kamera AR. Sikta på en riktig person. Matematisk spridning.</span>");
+                    
                 } catch (err) { window.log("<span style='color:red'>Kunde inte starta kamera.</span>"); }
             } else {
                 if (window.videoStream) { window.videoStream.getTracks().forEach(track => track.stop()); }
                 cameraFeed.style.display = 'none'; window.useCamera = false;
                 btnCamera.innerHTML = "📷 Kamera (AR)"; btnCamera.classList.remove('active-cam');
                 
-                if (window.placeMode) { window.confirmPlacement(); }
-                window.figureLocked = true;
-                if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); 
-                window.log("Återgått till svart bakgrund.");
+                // Återställ figur
+                if (typeof window.set3DVisibility === 'function') window.set3DVisibility(true);
+                window.show3DModel = true;
+                if(window.taserGroup) window.taserGroup.position.set(0, -0.9, 0); 
+                window.log("Återgått till svart bakgrund. Statisk figur.");
             }
         }
 
@@ -523,7 +542,11 @@
                 document.getElementById('camera-feed').style.display = 'none';
                 if (btnWebXR) { btnWebXR.textContent = '⛔ Avsluta WebXR'; btnWebXR.style.backgroundColor = '#e74c3c'; }
                 
+                // Säkerställ att figuren är aktiv och starta placering
+                if (typeof window.set3DVisibility === 'function') window.set3DVisibility(true);
+                window.show3DModel = true;
                 window.togglePlaceMode(); 
+                
                 session.addEventListener('end', window.onXRSessionEnded);
             }).catch(err => { if (err !== 'no-xr' && err !== 'session-ended') console.error(err); });
         }
@@ -536,9 +559,13 @@
             const btnWebXR = document.getElementById('btn-webxr');
             if (btnWebXR) { btnWebXR.textContent = '🌐 WebXR'; btnWebXR.style.backgroundColor = '#34495e'; }
             
-            if (window.placeMode) { window.confirmPlacement(); } 
+            if (window.placeMode) { 
+                document.getElementById('standard-controls').style.display = 'block';
+                document.getElementById('placement-controls').style.display = 'none';
+                window.placeMode = false;
+            } 
             window.figureLocked = true;
-            if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); 
+            if(window.taserGroup) window.taserGroup.position.set(0, -0.9, 0); 
             window.log("WebXR-session avslutad.");
         }
         window.endXRSession = async function() { if (window.xrSession) { await window.xrSession.end(); } }
@@ -750,11 +777,11 @@
         
         window.renderer = renderer; window.camera = camera; window.scene = scene;
 
-        // ----- NYTT: 3D HUD FÖR WEBXR -----
+        // ----- 3D HUD FÖR WEBXR -----
         const hudGroup = new THREE.Group();
         hudGroup.position.z = -0.5; // Halv meter framför kameran
         camera.add(hudGroup);
-        scene.add(camera); // Kameran måste ligga i scenen om den har barn
+        scene.add(camera);
 
         const crossMat = new THREE.MeshBasicMaterial({color: 0xffffff, transparent: true, opacity: 0.5, depthTest: false});
         const cross3D = new THREE.Mesh(new THREE.RingGeometry(0.005, 0.006, 32), crossMat);
@@ -769,8 +796,7 @@
         hudGroup.add(red3D);
 
         window.hud3D = { group: hudGroup, cross: cross3D, green: green3D, red: red3D };
-        window.hud3D.group.visible = false; // Döljs initialt, tänds i WebXR
-        // ----------------------------------
+        window.hud3D.group.visible = false; 
 
         scene.add(new THREE.AmbientLight(0xffffff, 0.6));
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.0); dirLight.position.set(2, 5, 5); scene.add(dirLight);
@@ -779,6 +805,10 @@
         let taserGroup = new THREE.Group(); scene.add(taserGroup); window.taserGroup = taserGroup;
         const loader = new GLTFLoader();
         
+        window.set3DVisibility = function(isVisible) { 
+            taserGroup.visible = isVisible; 
+        };
+
         loader.load('./ue_mannequin_retopology.glb', (gltf) => {
             let dummy = gltf.scene;
             const box = new THREE.Box3().setFromObject(dummy);
@@ -811,13 +841,12 @@
         placementMarker.children[1].rotation.x = -Math.PI / 2; placementMarker.children[0].rotation.x = -Math.PI / 2;
         placementMarker.position.y = 0.01; placementMarker.visible = false; scene.add(placementMarker); window.placeMarker = placementMarker;
 
-        const placementRaycaster = new THREE.Raycaster();
-
         window.onDartsFired = function(chamber) {
+            // Om vi är i Kamera AR (Utan 3D gubbe) använder vi bara ren matematik
             if (!window.show3DModel) {
                 let spreadCm = window.currentDistance * Math.tan((chamber === 1 ? 12 : 3.5) * Math.PI / 180) * 100;
                 if (spreadCm < 20.0) return { success: false, reason: `För tät spridning (${spreadCm.toFixed(1)} cm).` };
-                return { success: true, reason: `Spridning OK (${spreadCm.toFixed(1)} cm)` };
+                return { success: true, reason: `Spridning OK (${spreadCm.toFixed(1)} cm). (Träffzon antas godkänd)` };
             }
 
             const raycaster = new THREE.Raycaster();
@@ -858,21 +887,6 @@
             } else { return { success: false, reason: "En eller båda pilarna missade kroppen." }; }
         };
 
-        renderer.domElement.addEventListener('pointerdown', (event) => {
-            if (window.placeMode && window.xrSession && event.target === renderer.domElement) {
-                const rect = canvasContainer.getBoundingClientRect();
-                const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-                const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
-                placementRaycaster.setFromCamera(new THREE.Vector2(x, y), camera);
-                const hits = placementRaycaster.intersectObject(placementGround, true);
-                if (hits.length > 0) {
-                    window.placeMarker.position.copy(hits[0].point);
-                    window.placeMarker.position.y += 0.01;
-                    window.placeMarker.visible = true;
-                }
-            }
-        });
-
         renderer.setAnimationLoop((timestamp, frame) => {
             if (window.placeMode && renderer.xr.isPresenting && frame) {
                 const session = renderer.xr.getSession();
@@ -895,15 +909,6 @@
                             window.placeMarker.position.set(pose.transform.position.x, pose.transform.position.y + 0.01, pose.transform.position.z);
                         }
                     } else { window.placeMarker.visible = false; }
-                }
-            } 
-            else if (window.placeMode && !renderer.xr.isPresenting && window.useCamera) {
-                placementRaycaster.setFromCamera(new THREE.Vector2(0, 0), camera);
-                const hits = placementRaycaster.intersectObject(placementGround, true);
-                if (hits.length > 0) {
-                    window.placeMarker.position.copy(hits[0].point);
-                    window.placeMarker.position.y = 0.01;
-                    window.placeMarker.visible = true;
                 }
             }
 
