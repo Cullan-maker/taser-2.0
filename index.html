@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate Simulator v7.17</title>
+    <title>Taser 7 - Ultimate Simulator v7.18</title>
     <style>
         * { box-sizing: border-box; }
 
@@ -363,7 +363,7 @@
             setTimeout(() => { alertEl.classList.remove('show'); }, 4000);
         }
 
-        window.log("Simulator v7.17 startar... <span style='color:#f1c40f;'>Sätt i batteri och ladda!</span>");
+        window.log("Simulator v7.18 startar... <span style='color:#f1c40f;'>Sätt i batteri och ladda!</span>");
 
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
         document.querySelector('.hud-overlay').addEventListener('beforexrselect', e => e.preventDefault());
@@ -511,7 +511,6 @@
                     dir.y = window.detectedFloorLevel || 0;
                     window.taserGroup.position.copy(dir);
                 }
-                // taserGroup är nu fäst vid golvet så vi lägger inte till 0.9 här!
                 window.taserGroup.visible = true;
             }
             
@@ -557,7 +556,7 @@
                 if (typeof window.set3DVisibility === 'function') window.set3DVisibility(true);
                 window.show3DModel = true;
                 if(window.getUp) window.getUp();
-                if(window.taserGroup) window.taserGroup.position.set(0, 0, 0); 
+                if(window.taserGroup) window.taserGroup.position.set(0, -0.9, 0); 
                 window.log("Återgått till svart bakgrund. Statisk figur.");
             }
         }
@@ -606,13 +605,14 @@
                 document.getElementById('combat-controls').style.display = 'block';
                 document.getElementById('setup-controls').style.display = '';
                 document.getElementById('placement-controls').style.display = 'none';
-                document.getElementById('webxr-controls').style.display = 'none';
                 window.placeMode = false;
             } 
+            document.getElementById('webxr-controls').style.display = 'none';
+            
             window.figureLocked = true;
             window.updateDisplay();
             if(window.getUp) window.getUp();
-            if(window.taserGroup) window.taserGroup.position.set(0, 0, 0); 
+            if(window.taserGroup) window.taserGroup.position.set(0, -0.9, 0); 
             window.log("WebXR-session avslutad.");
         }
         window.endXRSession = async function() { if (window.xrSession) { await window.xrSession.end(); } }
@@ -627,7 +627,7 @@
                 cEl.classList.add('ok');
             }
             document.querySelectorAll('.dart-spark').forEach(el => el.remove());
-            if(window.getUp) window.getUp(); // Res figuren
+            if(window.getUp) window.getUp(); 
             window.updateDisplay();
             window.log("Vapnet och figuren har återställts.");
         }
@@ -653,7 +653,7 @@
         window.calibrateAim = function() {
             window.calibAlpha = null; window.calibBeta = null; 
             window.aimX = 50; window.aimY = 50; 
-            window.log("Siktet centrerat mot figuren.");
+            window.log("Siktet centrerat.");
         }
 
         function handleOrientation(event) {
@@ -860,10 +860,12 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.0); dirLight.position.set(2, 5, 5); scene.add(dirLight);
         const fillLight = new THREE.DirectionalLight(0xffffff, 0.5); fillLight.position.set(0, 0, -5); scene.add(fillLight);
 
-        let taserGroup = new THREE.Group(); scene.add(taserGroup); window.taserGroup = taserGroup;
+        let taserGroup = new THREE.Group(); 
+        taserGroup.position.set(0, -0.9, 0); // FIX: Gubben placeras direkt på golvet i Svart Läge!
+        scene.add(taserGroup); 
+        window.taserGroup = taserGroup;
         
         const fallPivot = new THREE.Group();
-        // Pivot placeras vid golvet
         fallPivot.position.set(0, 0, 0);
         taserGroup.add(fallPivot);
         window.fallPivot = fallPivot;
@@ -877,7 +879,6 @@
             const scale = 1.8 / (box.max.y - box.min.y); 
             dummy.scale.set(scale, scale, scale);
             
-            // Dummy nollställs. Dess interna origin (fötterna) är nu vid pivotpunkten.
             dummy.position.set(0, 0, 0); 
 
             dummy.traverse((child) => {
@@ -886,7 +887,6 @@
             fallPivot.add(dummy);
 
             const yellowMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.8, emissive: 0xf1c40f, emissiveIntensity: 0.3 });
-            // Höjderna är satta i meter relativt till golvet
             const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16), yellowMat); headMesh.position.set(0, 1.65, 0.0); headMesh.name = "Huvud/Hals"; fallPivot.add(headMesh);
             const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.2), yellowMat); chestMesh.position.set(0, 1.35, 0.08); chestMesh.name = "Hjärttrakten"; fallPivot.add(chestMesh);
             const groinMesh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), yellowMat); groinMesh.position.set(0, 0.85, 0.08); groinMesh.name = "Genitalier"; fallPivot.add(groinMesh);
@@ -1005,17 +1005,25 @@
                 }
             }
 
-            if (renderer.xr.isPresenting && frame && !window.isSafe && window.hasBattery && window.chamber1 !== "empty" && window.xrRefSpace) {
-                const viewerPose = frame.getViewerPose(window.xrRefSpace);
-                if (viewerPose) {
-                    const m = new THREE.Matrix4().fromArray(viewerPose.transform.matrix);
-                    const rightVector = new THREE.Vector3(1, 0, 0).transformDirection(m);
-                    
-                    if (Math.abs(rightVector.y) > 0.6) {
-                        const now = Date.now();
-                        if (now - window.lastTiltTime > 1000) {
-                            window.tiltWeapon();
-                            window.lastTiltTime = now;
+            // FIX: Robust WebXR Gyro som letar efter referens-rymden
+            if (renderer.xr.isPresenting && frame && !window.isSafe && window.hasBattery && window.chamber1 !== "empty") {
+                const referenceSpace = renderer.xr.getReferenceSpace();
+                if (referenceSpace) {
+                    const viewerPose = frame.getViewerPose(referenceSpace);
+                    if (viewerPose) {
+                        const q = viewerPose.transform.orientation;
+                        const quat = new THREE.Quaternion(q.x, q.y, q.z, q.w);
+                        const m = new THREE.Matrix4().makeRotationFromQuaternion(quat);
+                        
+                        // Kollar höger/vänster-lutning globalt i rummet
+                        const rightVector = new THREE.Vector3(1, 0, 0).transformDirection(m);
+                        
+                        if (Math.abs(rightVector.y) > 0.6) {
+                            const now = Date.now();
+                            if (now - window.lastTiltTime > 1000) {
+                                window.tiltWeapon();
+                                window.lastTiltTime = now;
+                            }
                         }
                     }
                 }
