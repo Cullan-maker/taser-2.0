@@ -170,7 +170,7 @@
         body.webxr-mode .log-box { display: none; }
 
         /* Modaler */
-        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 20000; justify-content: center; align-items: center; padding: 15px;}
+        .modal-overlay { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.85); z-index: 10000; justify-content: center; align-items: center; padding: 15px;}
         .modal-content { background: #2c3e50; width: 100%; max-width: 500px; max-height: 90vh; border-radius: 10px; border: 2px solid #f1c40f; padding: 20px; overflow-y: auto; position: relative; color: #ecf0f1; box-shadow: 0 10px 40px rgba(0,0,0,0.9);}
         .modal-close { position: absolute; top: 5px; right: 15px; font-size: 28px; color: #e74c3c; cursor: pointer; background: none; border: none; font-weight: bold; padding: 0;}
         .modal-content h2 { margin-top: 0; color: #f1c40f; border-bottom: 1px solid #34495e; padding-bottom: 8px; font-size: 16px;}
@@ -248,13 +248,13 @@
                     <div class="btn-grid-compact">
                         <button class="action-btn" onclick="window.toggleCassette()">⏏️ Kassett</button>
                         <button class="action-btn" onclick="window.toggleBattery()">🔋 Batteri</button>
-                        <button class="action-btn btn-stealth" onclick="window.activateStealth()">🥷 Dolt</button>
+                        <button class="action-btn btn-warn" id="btn-warn" onclick="window.pressDualWarning()">⚠️ Funk. Kontroll</button>
                     </div>
                     
                     <div class="btn-grid-compact">
                         <button class="action-btn" onclick="window.tiltWeapon()">🔄 Tilt (Z/X)</button>
-                        <button class="action-btn btn-warn" id="btn-warn" onclick="window.pressDualWarning()">⚠️ Funk. Kontroll</button>
-                        <button class="action-btn btn-reset" onclick="window.resetSimulator()">♻️ Återställ</button>
+                        <button class="action-btn btn-stealth" onclick="window.activateStealth()">🥷 Dolt</button>
+                        <button class="action-btn btn-info" onclick="window.openModal('info-modal')">ℹ️ Lathund</button>
                     </div>
 
                     <div id="secondary-controls">
@@ -267,7 +267,7 @@
                         <div class="btn-grid-compact">
                             <button class="action-btn btn-gyro" id="btn-gyro" onclick="window.initGyro()">📱 Gyro (Svart)</button>
                             <button class="action-btn" id="btn-invert" onclick="window.toggleInvertMouse()">↕️ Inv. Mus</button>
-                            <button class="action-btn btn-info" onclick="window.openModal('info-modal')">ℹ️ Lathund</button>
+                            <button class="action-btn btn-reset" onclick="window.resetSimulator()">♻️ Återställ</button>
                         </div>
                     </div>
 
@@ -289,9 +289,9 @@
         <div class="modal-content">
             <button class="modal-close" onclick="window.closeModal('info-modal')">×</button>
             <h2>Lathund: Taser 7 AR & WebXR</h2>
-            <p><strong>NMI Overlay:</strong> När du skjuter poppar en ruta upp och ger dig 100% feedback på om skottet gav NMI, hur stor spridningen blev och eventuella missar.</p>
-            <p><strong>Soft Reset:</strong> När du skjutit gubben och han fallit, tryck på <strong>♻️ Återställ</strong>. Gubben reser sig, NMI-rutan stängs och du får nya kassetter direkt.</p>
-            <p><strong>Combat Mode (Kompakt UI):</strong> När du osäkrar vapnet fälls alla inställningsknappar automatiskt in för att ge dig en så ren och stor skärm som möjligt.</p>
+            <p><strong>NMI Overlay:</strong> När du skjuter poppar en ruta upp och ger dig 100% feedback på om skottet gav NMI, hur stor spridningen blev och eventuella missar. Rutan försvinner automatiskt efter 3,5 sekunder.</p>
+            <p><strong>Soft Reset (Snabb återställning):</strong> När du skjutit gubben och han fallit, tryck på <strong>♻️ Återställ</strong>. Gubben reser sig, NMI-rutan stängs och du får automatiskt nya kassetter, så du slipper starta om WebXR-läget!</p>
+            <p><strong>Combat Mode (Kompakt UI):</strong> När du osäkrar vapnet fälls alla inställningsknappar automatiskt in för att ge dig en så ren och stor skärm som möjligt under insatsen.</p>
             <p><strong>Tilt för Kammare:</strong> Aktivera Gyro (eller var i WebXR). Luta/vicka mobilen hårt åt vänster eller höger för att snabbt byta mellan kammare 1 och 2.</p>
         </div>
     </div>
@@ -331,6 +331,8 @@
         window.placeMode = false; window.figureLocked = true; window.invertMouseY = false; 
         window.currentDistance = 3.0; window.cameraAngle = 0; window.aimX = 50; window.aimY = 50; 
         window.gyroEnabled = false; window.lastTiltTime = 0; window.figureFallen = false;
+        
+        window.nmiTimer = null; // Timer för att dölja resultatrutan
         
         let audioCtx = null; let isAudioInit = false; let soundInterval = null;
 
@@ -382,7 +384,7 @@
             setTimeout(() => { document.getElementById('warn-left').classList.remove('active-press'); document.getElementById('warn-right').classList.remove('active-press'); }, 200);
         }
 
-        // ----- NMI RUTA -----
+        // ----- NMI RUTA (MED AUTO-HIDE) -----
         window.showNMIOverlay = function(success, reason, spreadCm) {
             const overlay = document.getElementById('nmi-overlay');
             const title = document.getElementById('nmi-title');
@@ -400,8 +402,18 @@
                 spreadSpan.textContent = spreadCm ? spreadCm.toFixed(1) + " CM" : "--"; reasonSpan.textContent = reason;
             }
             overlay.style.display = "block";
+
+            // Rensa befintlig timer om man skjuter igen
+            if (window.nmiTimer) clearTimeout(window.nmiTimer);
+            
+            // Dölj automatiskt efter 3.5 sekunder
+            window.nmiTimer = setTimeout(() => {
+                window.hideNMIOverlay();
+            }, 3500);
         }
-        window.hideNMIOverlay = function() { document.getElementById('nmi-overlay').style.display = "none"; }
+        window.hideNMIOverlay = function() { 
+            document.getElementById('nmi-overlay').style.display = "none"; 
+        }
 
         // ----- PLACERING -----
         window.togglePlaceMode = function() {
@@ -462,7 +474,7 @@
         // ----- WEBXR -----
         window.startXR = function() {
             if (!navigator.xr) { window.log("<span style='color:red'>WebXR stöds inte.</span>"); return; }
-            if (!window.gyroEnabled) { window.initGyro(); } // Slå på gyro för Tilt-funktionen automatiskt
+            if (!window.gyroEnabled) { window.initGyro(); } 
             
             const btnWebXR = document.getElementById('btn-webxr');
             navigator.xr.isSessionSupported('immersive-ar').then((canHit) => {
@@ -505,7 +517,7 @@
         }
         window.endXRSession = async function() { if (window.xrSession) { await window.xrSession.end(); } }
 
-        // ----- GYRO (Separat hantering för Tilt och Kamerarotation) -----
+        // ----- GYRO -----
         window.initGyro = function() {
             window.initAudio(); 
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -517,14 +529,13 @@
         function enableGyro() {
             if(window.gyroEnabled) return;
             window.addEventListener('deviceorientation', handleOrientation);
-            window.gyroEnabled = true; window.log("Rörelsesensor (Tilt) aktiverad!");
+            window.gyroEnabled = true; window.log("Rörelsesensor aktiverad!");
             document.getElementById('btn-gyro').style.display = 'none';
         }
         
         function handleOrientation(event) {
             if (!window.gyroEnabled || window.placeMode) return;
 
-            // 1. TILT FÖR ATT BYTA KASSETT (FUNGERAR ALLTID, ÄVEN I WEBXR)
             if (event.gamma) {
                 const gamma = event.gamma; 
                 const now = Date.now();
@@ -536,7 +547,6 @@
                 }
             }
 
-            // 2. KAMERAROTATION (STÄNGS AV I WEBXR EFTERSOM WEBXR HAR EGEN KAMERASTYRNING)
             if (window.xrSession || !event.alpha) return;
 
             let alpha = event.alpha; let beta = event.beta;
@@ -607,7 +617,9 @@
                 window.chamber1 = "empty"; window.chamber2 = "empty"; window.activeChamber = 1; 
                 cEl.textContent = "⏏️ Kassetter ur"; cEl.classList.remove('ok'); window.log("Kassetter urtagna."); 
                 document.querySelectorAll('.dart-spark').forEach(el => el.remove());
-                if(window.figureFallen && window.taserGroup) { window.taserGroup.rotation.x = 0; window.figureFallen = false; }
+                if(window.figureFallen && window.taserGroup) {
+                    window.taserGroup.rotation.x = 0; window.figureFallen = false;
+                }
             }
             window.updateDisplay();
         }
@@ -636,6 +648,7 @@
             } else {
                 sSwitch.classList.add('unsafe'); document.getElementById('safety-label').textContent = "OSÄKRAD";
                 if(secControls) secControls.style.display = 'none'; 
+                
                 if(window.chamber1 === "empty" && window.chamber2 === "empty") { window.log("Osäkrad. (Endast grönt sikte, inga kassetter)"); }
                 if(window.hasBattery) {
                     if (window.displayState === "BOOT") { window.displayState = "FUNK_MODE"; window.log("Funktionskontroll (Infomeny) aktiv."); } else { window.displayState = "ACTIVE"; } 
@@ -713,11 +726,14 @@
         window.resetSimulator = function() { 
             window.initAudio();
             window.hideNMIOverlay();
+            
             window.chamber1 = "loaded"; window.chamber2 = "loaded"; window.activeChamber = 1;
             document.getElementById('stat-cassette').textContent = "⏏️ Kassetter i"; document.getElementById('stat-cassette').classList.add('ok');
             document.querySelectorAll('.dart-spark').forEach(el => el.remove());
+            
             if(window.figureFallen && window.taserGroup) { window.taserGroup.rotation.x = 0; window.figureFallen = false; }
             if(window.arcTimer) { clearInterval(window.arcTimer); window.arcTimer = null; document.getElementById('three-canvas').classList.remove('flash'); document.getElementById('warning-arc').style.display = 'none'; document.getElementById('lightning').style.display = 'none'; stopElectricSound(); }
+            
             window.log("♻️ <span style='color:#3498db; font-weight:bold;'>SOFT RESET: Vapnet laddat och mål återställt.</span>");
             window.updateDisplay(); 
         }
@@ -807,6 +823,7 @@
             scaleFactor = Math.min(Math.max(scaleFactor, 0.1), 5.0);
             let visualDropPx = (chamber === 1) ? 141.7 : 40.7; 
             visualDropPx = visualDropPx * scaleFactor; 
+
             let ndcDrop = visualDropPx / (rect.height / 2);
             let ndc2 = new THREE.Vector2(0, -ndcDrop); 
             const activeCamera = renderer.xr.isPresenting ? renderer.xr.getCamera(camera) : camera;
