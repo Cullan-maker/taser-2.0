@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>Taser 7 - Ultimate AR & WebXR v7.21</title>
+    <title>Taser 7 - Ultimate AR & WebXR v7.22</title>
     <style>
         * { box-sizing: border-box; }
 
@@ -36,7 +36,7 @@
         @keyframes redStrobe { 0% { filter: sepia(1) hue-rotate(-50deg) saturate(5) brightness(1.2); } 100% { filter: none; } }
 
         /* ----- SIKTET (FASTLÅST I MITTEN) ----- */
-        .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 100; }
+        .fixed-aim-layer { position: absolute; top: 0; left: 0; width: 100%; height: 100%; pointer-events: none; z-index: 9999; }
         .crosshair { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); width: 40px; height: 40px; border: 1px solid rgba(255,255,255,0.3); border-radius: 50%; }
         .crosshair::before, .crosshair::after { content: ''; position: absolute; background: rgba(255,255,255,0.5); }
         .crosshair::before { top: 50%; left: -5px; right: -5px; height: 1px; transform: translateY(-50%); }
@@ -235,7 +235,7 @@
                     <div class="btn-grid-compact">
                         <button class="action-btn btn-camera" id="btn-camera" onclick="window.toggleCamera()">📷 Kamera (AR)</button>
                         <button class="action-btn" id="btn-webxr" onclick="window.startXR()">🌐 WebXR</button>
-                        <button class="action-btn" id="btn-place" onclick="window.togglePlaceMode()">📍 Placera</button>
+                        <button class="action-btn" id="btn-place" onclick="window.togglePlaceMode()">📍 Flytta figur</button>
                     </div>
 
                     <div class="btn-grid-compact">
@@ -243,8 +243,6 @@
                         <button class="action-btn" id="btn-invert" onclick="window.toggleInvertMouse()">↕️ Inv. Mus</button>
                         <button class="action-btn btn-reset" onclick="window.resetSimulator()">♻️ Återställ</button>
                     </div>
-                    
-                    <button class="action-btn" id="btn-toggle-3d" onclick="window.toggle3DModel()" style="display:none; width: 100%; margin-top: 4px;">👁️ Dölj 3D</button>
                 </div>
 
                 <div id="placement-controls">
@@ -289,8 +287,9 @@
             entry.className = 'log-entry'; entry.innerHTML = `> ${msg}`;
             logBox.prepend(entry);
         }
-        window.log("Simulator v7.21 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
+        window.log("Simulator v7.22 startar... <span style='color:#f1c40f;'>Sätt i batteri!</span>");
 
+        // FÖRHINDRA ATT KLICK PÅ UI SKICKAS TILL 3D/WEBXR MILJÖN!
         document.querySelector('.main-container').addEventListener('beforexrselect', e => e.preventDefault());
         document.querySelector('.hud-overlay').addEventListener('beforexrselect', e => e.preventDefault());
 
@@ -391,11 +390,11 @@
             window.placeMode = false; window.figureLocked = true;
 
             if (window.taserGroup && window.placeMarker.visible) {
+                // Nu är taserGroup's origin EXAKT på golvet. Inget Y-offset behövs längre!
                 window.taserGroup.position.copy(window.placeMarker.position);
-                window.taserGroup.position.y += 0.9; 
                 window.taserGroup.visible = true;
             } else if (window.taserGroup) {
-                window.taserGroup.visible = true;
+                window.taserGroup.visible = true; 
             }
             
             if (window.placeMarker) window.placeMarker.visible = false;
@@ -430,7 +429,11 @@
                 
                 if (window.placeMode) { window.confirmPlacement(); }
                 window.figureLocked = true;
-                if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); 
+                if(window.taserGroup) {
+                    window.taserGroup.position.set(0, 0, 0); 
+                    window.taserGroup.rotation.x = 0;
+                    window.figureFallen = false;
+                }
                 window.log("Återgått till svart bakgrund.");
             }
         }
@@ -473,12 +476,16 @@
             
             if (window.placeMode) { window.confirmPlacement(); } 
             window.figureLocked = true;
-            if(window.taserGroup) window.taserGroup.position.set(0, 0.9, 0); 
+            if(window.taserGroup) {
+                window.taserGroup.position.set(0, 0, 0); 
+                window.taserGroup.rotation.x = 0;
+                window.figureFallen = false;
+            }
             window.log("WebXR-session avslutad.");
         }
         window.endXRSession = async function() { if (window.xrSession) { await window.xrSession.end(); } }
 
-        // ----- GYRO (Fixad FPS Camera Rotation) -----
+        // ----- GYRO (Fixad till stabil siktkamera istället för skakig rotation) -----
         window.initGyro = function() {
             window.initAudio(); 
             if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
@@ -498,8 +505,8 @@
             if (window.calibBeta === null) { window.calibAlpha = alpha; window.calibBeta = beta; }
             let deltaX = alpha - window.calibAlpha; if (deltaX > 180) deltaX -= 360; if (deltaX < -180) deltaX += 360;
             let deltaY = beta - window.calibBeta;
-            window.aimX = 50 + (deltaX * 1.5); window.aimY = 50 + (deltaY * 1.5); 
-            window.aimX = Math.max(-50, Math.min(150, window.aimX)); window.aimY = Math.max(-50, Math.min(150, window.aimY));
+            window.aimX = 50 + (deltaX * -0.8); window.aimY = 50 + (deltaY * -1.2); 
+            window.aimX = Math.max(0, Math.min(100, window.aimX)); window.aimY = Math.max(0, Math.min(100, window.aimY));
             window.updateAimVisuals();
         }
 
@@ -510,12 +517,12 @@
             document.getElementById('dist-label').textContent = `${window.currentDistance.toFixed(1)} M`;
             document.getElementById('spread-label').textContent = `SPRIDNING: ${spreadCm.toFixed(1)} CM`;
             
-            // Säkerhetsspärr för lasers drop (Förhindrar NaN i WebXR)
+            // Säkerhetsspärr för lasers drop (Förhindrar att de försvinner i WebXR)
             let safeDist = Math.max(0.5, window.currentDistance);
             if(isNaN(safeDist)) safeDist = 3.0;
             
             let baseScale = 0.5; let scaleFactor = (3.0 / safeDist) * baseScale; 
-            scaleFactor = Math.min(Math.max(scaleFactor, 0.1), 5.0); // Clamp
+            scaleFactor = Math.min(Math.max(scaleFactor, 0.1), 5.0); 
             let visualDropPx = ((window.activeChamber === 1) ? 141.7 : 40.7) * scaleFactor; 
             
             document.getElementById('laser-red').style.top = `calc(50% + ${visualDropPx}px)`; 
@@ -561,10 +568,11 @@
                 cEl.textContent = "⏏️ Kassetter ur"; cEl.classList.remove('ok'); window.log("Kassetter urtagna."); 
                 document.querySelectorAll('.dart-spark').forEach(el => el.remove());
                 
-                // Res figuren upp om den har fallit
+                // Res gubben upp om den fallit
                 if(window.figureFallen && window.taserGroup) {
                     window.taserGroup.rotation.x = 0;
                     window.figureFallen = false;
+                    window.log("Personen ställer sig upp igen.");
                 }
             }
             window.updateDisplay();
@@ -645,7 +653,10 @@
                             let fallInt = setInterval(() => {
                                 fallAngle -= 0.08;
                                 window.taserGroup.rotation.x = fallAngle;
-                                if(fallAngle <= -Math.PI / 2 + 0.2) clearInterval(fallInt);
+                                if(fallAngle <= -Math.PI / 2) {
+                                    window.taserGroup.rotation.x = -Math.PI / 2;
+                                    clearInterval(fallInt);
+                                }
                             }, 20);
                         }
 
@@ -690,15 +701,25 @@
         const dirLight = new THREE.DirectionalLight(0xffffff, 1.0); dirLight.position.set(2, 5, 5); scene.add(dirLight);
         const fillLight = new THREE.DirectionalLight(0xffffff, 0.5); fillLight.position.set(0, 0, -5); scene.add(fillLight);
 
+        // TaserGroup har nu sitt origin EXAKT på golvet
         let taserGroup = new THREE.Group(); scene.add(taserGroup); window.taserGroup = taserGroup;
         const loader = new GLTFLoader();
         
         loader.load('ue_mannequin_retopology.glb', (gltf) => {
             let dummy = gltf.scene;
+            
+            // Uppdatera matriser för att hitta exakta dimensioner
+            dummy.updateMatrixWorld(true);
             const box = new THREE.Box3().setFromObject(dummy);
-            const scale = 1.8 / (box.max.y - box.min.y); 
+            const modelHeight = box.max.y - box.min.y;
+            const scale = 1.8 / modelHeight; 
+            
             dummy.scale.set(scale, scale, scale);
-            dummy.position.set(0, -0.9, 0);
+            dummy.updateMatrixWorld(true);
+            
+            // Skapa en ny bounding box efter skalning för att hitta var fötterna är
+            const scaledBox = new THREE.Box3().setFromObject(dummy);
+            dummy.position.y = -scaledBox.min.y; // Tvingar fötterna till exakt y=0 inuti gruppen!
 
             dummy.traverse((child) => {
                 if (child.isMesh) { child.material = new THREE.MeshStandardMaterial({ color: 0x2ecc71, roughness: 0.6, metalness: 0.2 }); child.name = "Godkand_Zon"; }
@@ -706,9 +727,9 @@
             taserGroup.add(dummy);
 
             const yellowMat = new THREE.MeshStandardMaterial({ color: 0xf1c40f, transparent: true, opacity: 0.8, emissive: 0xf1c40f, emissiveIntensity: 0.3 });
-            const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16), yellowMat); headMesh.position.set(0, 0.75, 0.0); headMesh.name = "Huvud/Hals"; taserGroup.add(headMesh);
-            const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.2), yellowMat); chestMesh.position.set(0, 0.45, 0.08); chestMesh.name = "Hjärttrakten"; taserGroup.add(chestMesh);
-            const groinMesh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), yellowMat); groinMesh.position.set(0, -0.05, 0.08); groinMesh.name = "Genitalier"; taserGroup.add(groinMesh);
+            const headMesh = new THREE.Mesh(new THREE.SphereGeometry(0.13, 16, 16), yellowMat); headMesh.position.set(0, 1.65, 0.0); headMesh.name = "Huvud/Hals"; taserGroup.add(headMesh);
+            const chestMesh = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.25, 0.2), yellowMat); chestMesh.position.set(0, 1.35, 0.08); chestMesh.name = "Hjärttrakten"; taserGroup.add(chestMesh);
+            const groinMesh = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 0.15), yellowMat); groinMesh.position.set(0, 0.85, 0.08); groinMesh.name = "Genitalier"; taserGroup.add(groinMesh);
 
             window.log("<span style='color:#2ecc71'>3D-Gubbe inladdad!</span>");
         }, undefined, (e) => { window.log("<span style='color:red'>Laddningsfel (GLB).</span>"); });
@@ -736,14 +757,13 @@
             const rect = canvasContainer.getBoundingClientRect();
             let ndc1 = new THREE.Vector2(0, 0); 
             
-            // Säkerhetsspärr för lasers drop
             let safeDist = Math.max(0.5, window.currentDistance);
             if(isNaN(safeDist)) safeDist = 3.0;
             let baseScale = 0.5; let scaleFactor = (3.0 / safeDist) * baseScale; 
             scaleFactor = Math.min(Math.max(scaleFactor, 0.1), 5.0);
             
             let visualDropPx = (chamber === 1) ? 141.7 : 40.7; 
-            visualDropPx = visualDropPx * scaleFactor; // Applicera avståndsskalning på 3D-skottet också!
+            visualDropPx = visualDropPx * scaleFactor; 
 
             let ndcDrop = visualDropPx / (rect.height / 2);
             let ndc2 = new THREE.Vector2(0, -ndcDrop); 
@@ -829,26 +849,32 @@
             }
 
             if (renderer.xr.isPresenting && window.figureLocked && window.taserGroup.visible) {
-                let rawDist = camera.position.distanceTo(window.taserGroup.position);
+                // För att avståndet i WebXR inte ska påverkas för mycket av fall/längd, 
+                // mäter vi horisontellt mot gubbens bröstkorg.
+                let chestPos = new THREE.Vector3(window.taserGroup.position.x, window.taserGroup.position.y + 1.35, window.taserGroup.position.z);
+                let rawDist = camera.position.distanceTo(chestPos);
+                
                 if(!isNaN(rawDist) && rawDist > 0.1) {
                     window.currentDistance = Math.max(0.5, rawDist); 
                     window.updateAimVisuals(); 
                 }
             }
 
-            // NY KÄNSLA: Äkta FPS-kamera för mus & gyro!
             if (!renderer.xr.isPresenting) {
                 if(window.useCamera) { scene.background = null; } else { scene.background = new THREE.Color(0x111111); }
 
+                // Stabil Orbit-kamera för mus & gyro (förhindrar att gubben försvinner)
                 camera.position.set(0, 1.5, window.currentDistance);
                 
-                let yaw = (50 - window.aimX) * 0.015; 
-                let pitch = (50 - window.aimY) * 0.015; 
+                let lookTarget = new THREE.Vector3(0, 1.5, 0); 
+                let panX = (50 - window.aimX) * 0.01 * window.currentDistance;
+                let activeAimY = window.invertMouseY ? (100 - window.aimY) : window.aimY;
+                let panY = (activeAimY - 50) * 0.01 * window.currentDistance;
+                
+                lookTarget.y += panY;
+                lookTarget.x -= panX;
 
-                camera.rotation.order = "YXZ";
-                camera.rotation.y = yaw;
-                camera.rotation.x = pitch;
-                camera.rotation.z = 0;
+                camera.lookAt(lookTarget);
             }
             
             renderer.render(scene, camera);
